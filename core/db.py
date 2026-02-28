@@ -6,10 +6,21 @@ Run directly to initialise:  python core/db.py
 """
 
 import logging
+import os
 import sqlite3
 from pathlib import Path
 
-DB_PATH = Path("data/system/dashin.db")
+
+def _get_db_path():
+    if os.getenv('HOME') == '/home/appuser' or os.getenv('STREAMLIT_SHARING_MODE'):
+        return Path('/tmp/dashin.db')
+    base = Path(__file__).parent
+    path = base / '..' / 'data' / 'system' / 'dashin.db'
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+DB_PATH = _get_db_path()
 
 
 def _dict_factory(cursor, row):

@@ -283,6 +283,28 @@ def _clear_failed_saves():
 # ── RENDER ─────────────────────────────────────────────────────────────────────
 
 def render(user: dict = None):
+    try:
+        from playwright.sync_api import sync_playwright
+        _playwright_ok = True
+    except ImportError:
+        _playwright_ok = False
+
+    if not _playwright_ok:
+        st.info("### 🖥️ Scraper runs on your local machine")
+        st.markdown("""
+        The scraper opens a real browser so you can log in to Brella, BETT,
+        and other event platforms. It cannot run in the cloud.
+
+        **To scrape a new event locally:**
+        1. Pull latest code to your machine
+        2. `pip install playwright playwright-stealth`
+        3. `playwright install chromium`
+        4. `python worker.py https://next.brella.io/events/EVENTNAME/people`
+
+        All scraped leads save automatically to the shared inventory.
+        """)
+        return
+
     org_id = (user or {}).get("org_id", 1)
     role   = (user or {}).get("role", "researcher")
     is_admin = role in ("super_admin", "org_admin")

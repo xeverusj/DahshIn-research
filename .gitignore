@@ -41,3 +41,20 @@ Thumbs.db
 # Failed save logs
 failed_db_saves.json
 fix_log.txt
+
+# Cloud deploy — keep structure, ignore data files
+data/system/*.csv
+data/system/*.db
+data/system/*.db-shm
+data/system/*.db-wal
+data/system/sessions/
+*.checkpoint
+!data/.gitkeep
+!data/system/.gitkeep
+!data/system/sessions/.gitkeep
+
+# Bundles and local artifacts
+*.bundle
+
+# Old subfolder (now flattened to root)
+app to test with Jan/

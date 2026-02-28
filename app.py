@@ -20,6 +20,24 @@ import logging
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
+# ── Cloud environment setup ──────────────────────────────────────────────────
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
+try:
+    import streamlit as _st_env
+    if hasattr(_st_env, 'secrets'):
+        for _key in ['ANTHROPIC_API_KEY', 'FLASK_SECRET_KEY', 'SMTP_HOST',
+                     'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS']:
+            if _key not in os.environ and _key in _st_env.secrets:
+                os.environ[_key] = str(_st_env.secrets[_key])
+except Exception:
+    pass
+# ─────────────────────────────────────────────────────────────────────────────
+
 import streamlit as st
 from core.db import init_db, migrate_db, ensure_defaults, get_connection
 

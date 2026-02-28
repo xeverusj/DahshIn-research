@@ -10,6 +10,18 @@ import os
 import sqlite3
 from pathlib import Path
 
+# ── ROLE DEFINITIONS PER ORG TYPE ─────────────────────────────────────────────
+# Used by access_control.py and admin dashboard Add User form.
+# Maps org_type → list of valid roles assignable within that org.
+ROLES_BY_ORG_TYPE = {
+    'dashin':    ['super_admin', 'org_admin', 'manager'],
+    'agency':    ['org_admin', 'manager', 'research_manager',
+                  'researcher', 'campaign_manager', 'client_user'],
+    'freelance': ['org_admin', 'manager', 'research_manager',
+                  'researcher', 'client_user'],
+    'client':    ['client_admin', 'client_user'],
+}
+
 
 def _get_db_path():
     if os.getenv('HOME') == '/home/appuser' or os.getenv('STREAMLIT_SHARING_MODE'):
@@ -47,20 +59,32 @@ def init_db():
 
     c.execute("""
     CREATE TABLE IF NOT EXISTS organisations (
-        id              INTEGER PRIMARY KEY AUTOINCREMENT,
-        name            TEXT    NOT NULL,
-        slug            TEXT    NOT NULL UNIQUE,   -- used in URLs / display
-        tier            TEXT    NOT NULL DEFAULT 'starter',
+        id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+        name                TEXT    NOT NULL,
+        slug                TEXT    NOT NULL UNIQUE,   -- used in URLs / display
+        tier                TEXT    NOT NULL DEFAULT 'starter',
         -- scraper | starter | growth | agency | enterprise
-        ai_budget_usd   REAL    NOT NULL DEFAULT 8.0,
-        billing_day     INTEGER DEFAULT 1,         -- day of month billing resets
-        max_users       INTEGER DEFAULT 5,
-        max_clients     INTEGER DEFAULT 3,
-        max_leads       INTEGER DEFAULT 10000,
-        is_active       INTEGER DEFAULT 1,
-        notes           TEXT,                      -- super admin notes
-        created_at      TEXT    DEFAULT (datetime('now')),
-        suspended_at    TEXT
+        ai_budget_usd       REAL    NOT NULL DEFAULT 8.0,
+        billing_day         INTEGER DEFAULT 1,         -- day of month billing resets
+        max_users           INTEGER DEFAULT 5,
+        max_clients         INTEGER DEFAULT 3,
+        max_leads           INTEGER DEFAULT 10000,
+        is_active           INTEGER DEFAULT 1,
+        notes               TEXT,                      -- super admin notes
+        created_at          TEXT    DEFAULT (datetime('now')),
+        suspended_at        TEXT,
+        -- Multi-tenant hierarchy fields
+        org_type            TEXT    NOT NULL DEFAULT 'agency',
+        -- values: 'dashin' | 'agency' | 'freelance' | 'client'
+        parent_org_id       INTEGER REFERENCES organisations(id),
+        -- NULL for dashin/top-level; set for client orgs under an agency
+        subscription_tier   TEXT    NOT NULL DEFAULT 'free',
+        -- values: 'free' | 'starter' | 'growth' | 'enterprise' | 'client_direct'
+        subscription_status TEXT    NOT NULL DEFAULT 'active',
+        -- values: 'active' | 'suspended' | 'cancelled'
+        onboarded_at        TEXT,
+        onboarded_by        INTEGER REFERENCES users(id)
+        -- the Dashin account manager who created them
     )""")
 
     c.execute("""
@@ -123,6 +147,7 @@ def init_db():
         is_active           INTEGER DEFAULT 1,
         must_reset_password INTEGER DEFAULT 0,
         last_login          TEXT,
+        onboarded_at        TEXT,
         created_at          TEXT    DEFAULT (datetime('now'))
     )""")
 
@@ -200,13 +225,16 @@ def init_db():
         -- new | assigned | in_progress | enriched | no_email |
         -- contacted | waiting | responded | interested |
         -- meeting_requested | booked | not_interested | no_show | archived
-        times_seen      INTEGER DEFAULT 1,
-        first_seen_at   TEXT    DEFAULT (datetime('now')),
-        last_seen_at    TEXT    DEFAULT (datetime('now')),
-        enriched_at     TEXT,
-        used_at         TEXT,
-        archived_at     TEXT,
-        archived_list_id INTEGER REFERENCES archived_lists(id),
+        times_seen          INTEGER DEFAULT 1,
+        first_seen_at       TEXT    DEFAULT (datetime('now')),
+        last_seen_at        TEXT    DEFAULT (datetime('now')),
+        enriched_at         TEXT,
+        used_at             TEXT,
+        archived_at         TEXT,
+        archived_list_id    INTEGER REFERENCES archived_lists(id),
+        released_to_client  INTEGER DEFAULT 0,
+        -- 0 = in agency inventory only; 1 = visible to the assigned client
+        scraped_at          TEXT    DEFAULT (datetime('now')),
         UNIQUE(org_id, name_key, company_id)
     )""")
 
@@ -631,6 +659,56 @@ def init_db():
     )""")
 
     # ══════════════════════════════════════════════════════════════════
+    # FREELANCER → CLIENT ASSIGNMENTS
+    # ══════════════════════════════════════════════════════════════════
+
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS freelancer_client_assignments (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        freelancer_org_id INTEGER NOT NULL REFERENCES organisations(id),
+        client_org_id     INTEGER NOT NULL REFERENCES organisations(id),
+        assigned_by       INTEGER NOT NULL REFERENCES users(id),
+        assigned_at       TEXT    DEFAULT (datetime('now')),
+        active            INTEGER DEFAULT 1,
+        UNIQUE(freelancer_org_id, client_org_id)
+    )""")
+
+    # ══════════════════════════════════════════════════════════════════
+    # SUBSCRIPTION TIERS
+    # ══════════════════════════════════════════════════════════════════
+
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS subscription_tiers (
+        tier                TEXT PRIMARY KEY,
+        display_name        TEXT NOT NULL,
+        max_users           INTEGER,        -- NULL = unlimited
+        max_clients         INTEGER,        -- NULL = unlimited
+        max_leads_per_month INTEGER,        -- NULL = unlimited
+        can_enrich          INTEGER DEFAULT 1,
+        can_run_campaigns   INTEGER DEFAULT 1,
+        can_use_ai          INTEGER DEFAULT 1,
+        white_label_portal  INTEGER DEFAULT 0,
+        api_access          INTEGER DEFAULT 0,
+        price_gbp_monthly   REAL    DEFAULT 0
+    )""")
+
+    # Seed subscription tiers (INSERT OR IGNORE = idempotent)
+    _tiers = [
+        ('free',          'Free',          1,    0,    200,   0, 0, 0, 0, 0, 0),
+        ('starter',       'Starter',       5,    2,    1000,  1, 1, 0, 0, 0, 149),
+        ('growth',        'Growth',        15,   10,   5000,  1, 1, 1, 0, 0, 399),
+        ('enterprise',    'Enterprise',    None, None, None,  1, 1, 1, 1, 1, 999),
+        ('client_direct', 'Client Direct', 3,    None, None,  0, 0, 0, 0, 0, 49),
+    ]
+    c.executemany("""
+        INSERT OR IGNORE INTO subscription_tiers
+            (tier, display_name, max_users, max_clients, max_leads_per_month,
+             can_enrich, can_run_campaigns, can_use_ai,
+             white_label_portal, api_access, price_gbp_monthly)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?)
+    """, _tiers)
+
+    # ══════════════════════════════════════════════════════════════════
     # INDEXES — keep queries fast as data grows
     # ══════════════════════════════════════════════════════════════════
 
@@ -729,47 +807,57 @@ def migrate_db():
     # New columns on existing tables
     new_cols = [
         # organisations
-        ("organisations", "ai_budget_usd",     "REAL DEFAULT 8.0"),
-        ("organisations", "billing_day",        "INTEGER DEFAULT 1"),
-        ("organisations", "max_users",          "INTEGER DEFAULT 5"),
-        ("organisations", "max_clients",        "INTEGER DEFAULT 3"),
-        ("organisations", "max_leads",          "INTEGER DEFAULT 10000"),
-        ("organisations", "suspended_at",       "TEXT"),
+        ("organisations", "ai_budget_usd",       "REAL DEFAULT 8.0"),
+        ("organisations", "billing_day",          "INTEGER DEFAULT 1"),
+        ("organisations", "max_users",            "INTEGER DEFAULT 5"),
+        ("organisations", "max_clients",          "INTEGER DEFAULT 3"),
+        ("organisations", "max_leads",            "INTEGER DEFAULT 10000"),
+        ("organisations", "suspended_at",         "TEXT"),
+        # Multi-tenant hierarchy
+        ("organisations", "org_type",             "TEXT NOT NULL DEFAULT 'agency'"),
+        ("organisations", "parent_org_id",        "INTEGER"),
+        ("organisations", "subscription_tier",    "TEXT NOT NULL DEFAULT 'free'"),
+        ("organisations", "subscription_status",  "TEXT NOT NULL DEFAULT 'active'"),
+        ("organisations", "onboarded_at",         "TEXT"),
+        ("organisations", "onboarded_by",         "INTEGER"),
         # users
-        ("users", "org_id",                    "INTEGER DEFAULT 1"),
-        ("users", "client_id",                 "INTEGER"),
-        ("users", "last_login",                "TEXT"),
-        ("users", "must_reset_password",       "INTEGER DEFAULT 0"),
+        ("users", "org_id",                      "INTEGER DEFAULT 1"),
+        ("users", "client_id",                   "INTEGER"),
+        ("users", "last_login",                  "TEXT"),
+        ("users", "must_reset_password",         "INTEGER DEFAULT 0"),
+        ("users", "onboarded_at",                "TEXT"),
         # leads
-        ("leads", "org_id",                    "INTEGER DEFAULT 1"),
-        ("leads", "source_type",               "TEXT DEFAULT 'event'"),
+        ("leads", "org_id",                      "INTEGER DEFAULT 1"),
+        ("leads", "source_type",                 "TEXT DEFAULT 'event'"),
+        ("leads", "released_to_client",          "INTEGER DEFAULT 0"),
+        ("leads", "scraped_at",                  "TEXT DEFAULT (datetime('now'))"),
         # companies
-        ("companies", "org_id",                "INTEGER DEFAULT 1"),
+        ("companies", "org_id",                  "INTEGER DEFAULT 1"),
         # campaigns
-        ("campaigns", "org_id",                "INTEGER DEFAULT 1"),
-        ("campaigns", "is_visible_to_client",  "INTEGER DEFAULT 0"),
-        ("campaigns", "marked_ready_by",       "INTEGER"),
-        ("campaigns", "marked_ready_at",       "TEXT"),
-        ("campaigns", "lead_count",            "INTEGER DEFAULT 0"),
+        ("campaigns", "org_id",                  "INTEGER DEFAULT 1"),
+        ("campaigns", "is_visible_to_client",    "INTEGER DEFAULT 0"),
+        ("campaigns", "marked_ready_by",         "INTEGER"),
+        ("campaigns", "marked_ready_at",         "TEXT"),
+        ("campaigns", "lead_count",              "INTEGER DEFAULT 0"),
         # campaign_leads
-        ("campaign_leads", "crm_status",       "TEXT DEFAULT 'new'"),
-        ("campaign_leads", "next_step",        "TEXT"),
-        ("campaign_leads", "outreach_from",    "TEXT"),
-        ("campaign_leads", "meeting_date",     "TEXT"),
-        ("campaign_leads", "notes",            "TEXT"),
-        ("campaign_leads", "last_updated_by",  "INTEGER"),
-        ("campaign_leads", "last_updated_at",  "TEXT"),
+        ("campaign_leads", "crm_status",         "TEXT DEFAULT 'new'"),
+        ("campaign_leads", "next_step",          "TEXT"),
+        ("campaign_leads", "outreach_from",      "TEXT"),
+        ("campaign_leads", "meeting_date",       "TEXT"),
+        ("campaign_leads", "notes",              "TEXT"),
+        ("campaign_leads", "last_updated_by",    "INTEGER"),
+        ("campaign_leads", "last_updated_at",    "TEXT"),
         # scrape_sessions
-        ("scrape_sessions", "org_id",          "INTEGER DEFAULT 1"),
-        ("scrape_sessions", "ai_tokens_used",  "INTEGER DEFAULT 0"),
-        ("scrape_sessions", "ai_cost_usd",     "REAL DEFAULT 0.0"),
-        ("scrape_sessions", "pattern_used",    "INTEGER DEFAULT 0"),
-        ("scrape_sessions", "scrape_quality",  "TEXT"),
-        ("scrape_sessions", "process_pid",     "INTEGER"),
+        ("scrape_sessions", "org_id",            "INTEGER DEFAULT 1"),
+        ("scrape_sessions", "ai_tokens_used",    "INTEGER DEFAULT 0"),
+        ("scrape_sessions", "ai_cost_usd",       "REAL DEFAULT 0.0"),
+        ("scrape_sessions", "pattern_used",      "INTEGER DEFAULT 0"),
+        ("scrape_sessions", "scrape_quality",    "TEXT"),
+        ("scrape_sessions", "process_pid",       "INTEGER"),
         # archived_lists
-        ("archived_lists", "org_id",           "INTEGER DEFAULT 1"),
+        ("archived_lists", "org_id",             "INTEGER DEFAULT 1"),
         # clients
-        ("clients", "org_id",                  "INTEGER DEFAULT 1"),
+        ("clients", "org_id",                    "INTEGER DEFAULT 1"),
     ]
 
     added = 0
@@ -780,14 +868,67 @@ def migrate_db():
         except Exception:
             pass  # Column already exists — expected during repeated migration runs
 
+    # Create new tables introduced in multi-tenant update
+    try:
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS freelancer_client_assignments (
+            id                INTEGER PRIMARY KEY AUTOINCREMENT,
+            freelancer_org_id INTEGER NOT NULL REFERENCES organisations(id),
+            client_org_id     INTEGER NOT NULL REFERENCES organisations(id),
+            assigned_by       INTEGER NOT NULL REFERENCES users(id),
+            assigned_at       TEXT    DEFAULT (datetime('now')),
+            active            INTEGER DEFAULT 1,
+            UNIQUE(freelancer_org_id, client_org_id)
+        )""")
+    except Exception:
+        pass
+
+    try:
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS subscription_tiers (
+            tier                TEXT PRIMARY KEY,
+            display_name        TEXT NOT NULL,
+            max_users           INTEGER,
+            max_clients         INTEGER,
+            max_leads_per_month INTEGER,
+            can_enrich          INTEGER DEFAULT 1,
+            can_run_campaigns   INTEGER DEFAULT 1,
+            can_use_ai          INTEGER DEFAULT 1,
+            white_label_portal  INTEGER DEFAULT 0,
+            api_access          INTEGER DEFAULT 0,
+            price_gbp_monthly   REAL    DEFAULT 0
+        )""")
+        _tiers = [
+            ('free',          'Free',          1,    0,    200,   0, 0, 0, 0, 0, 0),
+            ('starter',       'Starter',       5,    2,    1000,  1, 1, 0, 0, 0, 149),
+            ('growth',        'Growth',        15,   10,   5000,  1, 1, 1, 0, 0, 399),
+            ('enterprise',    'Enterprise',    None, None, None,  1, 1, 1, 1, 1, 999),
+            ('client_direct', 'Client Direct', 3,    None, None,  0, 0, 0, 0, 0, 49),
+        ]
+        c.executemany("""
+            INSERT OR IGNORE INTO subscription_tiers
+                (tier, display_name, max_users, max_clients, max_leads_per_month,
+                 can_enrich, can_run_campaigns, can_use_ai,
+                 white_label_portal, api_access, price_gbp_monthly)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?)
+        """, _tiers)
+    except Exception:
+        pass
+
     # Ensure default org exists for existing single-tenant data
     try:
         c.execute("""
             INSERT OR IGNORE INTO organisations
                 (id, name, slug, tier, ai_budget_usd, billing_day,
-                 max_users, max_clients, max_leads)
-            VALUES (1, 'Default Organisation', 'default', 'agency',
-                    50.0, 1, 9999, 9999, 9999999)
+                 max_users, max_clients, max_leads,
+                 org_type, subscription_tier, subscription_status)
+            VALUES (1, 'Dashin', 'dashin', 'enterprise',
+                    50.0, 1, 9999, 9999, 9999999,
+                    'dashin', 'enterprise', 'active')
+        """)
+        # Ensure org_id=1 is always marked as 'dashin' type
+        c.execute("""
+            UPDATE organisations SET org_type='dashin' WHERE id=1
         """)
     except Exception as e:
         logging.warning(f"[db.migrate_db] Failed to insert default org: {e}")
@@ -838,14 +979,18 @@ def ensure_defaults():
     conn = get_connection()
     c = conn.cursor()
 
-    # Default org
+    # Default org — Dashin itself
     c.execute("""
         INSERT OR IGNORE INTO organisations
             (id, name, slug, tier, ai_budget_usd, billing_day,
-             max_users, max_clients, max_leads)
-        VALUES (1, 'Default Organisation', 'default', 'agency',
-                50.0, 1, 9999, 9999, 9999999)
+             max_users, max_clients, max_leads,
+             org_type, subscription_tier, subscription_status)
+        VALUES (1, 'Dashin', 'dashin', 'enterprise',
+                50.0, 1, 9999, 9999, 9999999,
+                'dashin', 'enterprise', 'active')
     """)
+    # Always ensure org 1 is marked as dashin type
+    c.execute("UPDATE organisations SET org_type='dashin' WHERE id=1")
 
     # Super admin — use bcrypt if available
     try:

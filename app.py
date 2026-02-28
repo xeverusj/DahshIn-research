@@ -611,6 +611,16 @@ def main():
         user["role"] = live["role"]
         st.session_state["user"] = user
 
+    # Onboarding wizard — show on first login until completed
+    if not user.get("onboarded_at"):
+        try:
+            from dashboards.onboarding_wizard import render as render_onboarding
+            render_onboarding(user)
+            st.stop()
+        except Exception as _ob_err:
+            logging.warning(f"[app] Onboarding wizard failed: {_ob_err}")
+            # Don't block the app if wizard fails
+
     # Render
     page = render_sidebar(user)
     route(page, user)

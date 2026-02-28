@@ -66,10 +66,12 @@ def login(email: str, password: str) -> dict | None:
     conn = get_connection()
     user = conn.execute("""
         SELECT u.*,
-               o.name  AS org_name,
-               o.tier  AS org_tier,
-               o.is_active AS org_active,
-               c.name  AS client_name
+               o.name               AS org_name,
+               o.tier               AS org_tier,
+               o.is_active          AS org_active,
+               o.org_type           AS org_type,
+               o.subscription_tier  AS subscription_tier,
+               c.name               AS client_name
         FROM users u
         LEFT JOIN organisations o ON o.id = u.org_id
         LEFT JOIN clients c       ON c.id = u.client_id

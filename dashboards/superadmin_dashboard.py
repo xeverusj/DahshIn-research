@@ -221,8 +221,9 @@ def render(user: dict):
         </div>
         """, unsafe_allow_html=True)
 
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
         "🏢 All Orgs",
+        "🏛 Org Hierarchy",
         "💰 AI Costs",
         "➕ New Org",
         "📊 Platform Stats",
@@ -233,15 +234,17 @@ def render(user: dict):
     with tab1:
         _render_all_orgs(dark)
     with tab2:
-        _render_ai_costs(dark)
+        _render_org_hierarchy(user, dark)
     with tab3:
-        _render_new_org()
+        _render_ai_costs(dark)
     with tab4:
-        _render_platform_stats(dark)
+        _render_new_org()
     with tab5:
+        _render_platform_stats(dark)
+    with tab6:
         from dashboards.site_library_dashboard import render as render_site_lib
         render_site_lib(user, allow_delete=True, allow_mark_stable=True)
-    with tab6:
+    with tab7:
         _render_backup_ui()
 
 
@@ -396,6 +399,139 @@ def _render_org_editor(org: dict):
             st.rerun()
 
 
+# ── ORG HIERARCHY ─────────────────────────────────────────────────────────────
+
+ORG_TYPE_BADGE = {
+    'dashin':   ('background:#1A2E4A;color:#4FC3F7;', 'DASHIN'),
+    'agency':   ('background:#2A1A2E;color:#CE93D8;', 'AGENCY'),
+    'freelance':('background:#1A2E1A;color:#81C784;', 'FREELANCE'),
+    'client':   ('background:#2E1A1A;color:#FFB74D;', 'CLIENT'),
+}
+
+def _render_org_hierarchy(user: dict, dark: bool = True):
+    """Org hierarchy view: shows all orgs grouped by type with parent-child relationships."""
+    st.subheader("Organisation Hierarchy")
+    st.caption(
+        "Shows all organisations by type and their parent-child relationships. "
+        "Client orgs are linked to their parent agency."
+    )
+
+    conn = get_connection()
+    all_orgs = conn.execute("""
+        SELECT o.*,
+               p.name AS parent_name,
+               (SELECT COUNT(*) FROM users WHERE org_id=o.id AND is_active=1) AS user_count,
+               (SELECT COUNT(*) FROM leads WHERE org_id=o.id) AS lead_count,
+               (SELECT COUNT(*) FROM clients WHERE org_id=o.id AND is_active=1) AS client_count
+        FROM organisations o
+        LEFT JOIN organisations p ON p.id = o.parent_org_id
+        ORDER BY o.org_type, o.is_active DESC, o.name
+    """).fetchall()
+    conn.close()
+
+    orgs = [dict(r) for r in all_orgs]
+
+    # Filter controls
+    col_f1, col_f2 = st.columns(2)
+    with col_f1:
+        type_filter = st.selectbox(
+            "Filter by type",
+            ["All", "dashin", "agency", "freelance", "client"],
+            format_func=lambda x: x.title() if x != "All" else "All Types"
+        )
+    with col_f2:
+        status_filter = st.selectbox(
+            "Filter by status",
+            ["All", "Active", "Suspended"],
+        )
+
+    displayed = [
+        o for o in orgs
+        if (type_filter == "All" or o.get('org_type') == type_filter)
+        and (status_filter == "All"
+             or (status_filter == "Active" and o.get('is_active'))
+             or (status_filter == "Suspended" and not o.get('is_active')))
+    ]
+
+    st.markdown(f"**{len(displayed)} organisations shown**")
+    st.markdown("---")
+
+    for o in displayed:
+        otype  = o.get('org_type', 'agency')
+        badge_style, badge_label = ORG_TYPE_BADGE.get(otype, ('background:#333;color:#FFF;', otype.upper()))
+        status_icon = "🟢" if o.get('is_active') else "🔴"
+        parent_str  = f" ↳ {o['parent_name']}" if o.get('parent_name') else ""
+
+        st.markdown(f"""
+        <div class="org-card">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <div>
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                        <div class="org-name">{status_icon} {o.get('name','')}</div>
+                        <span style="{badge_style}padding:2px 8px;border-radius:10px;
+                                     font-size:9px;font-weight:700;letter-spacing:1px;">
+                            {badge_label}
+                        </span>
+                        <span class="tier-chip tier-{o.get('tier','starter')}">{o.get('tier','')}</span>
+                    </div>
+                    <div class="org-meta">
+                        👥 {o.get('user_count',0)} users ·
+                        🧑 {o.get('lead_count',0):,} leads ·
+                        🏢 {o.get('client_count',0)} clients
+                        {parent_str}
+                    </div>
+                </div>
+                <div style="text-align:right;font-size:11px;color:#666;">
+                    ID: {o.get('id')}<br>
+                    Sub: {o.get('subscription_tier','free')}
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        with st.expander(f"Manage — {o.get('name','')}"):
+            col_m1, col_m2 = st.columns(2)
+            with col_m1:
+                # Quick status toggle
+                new_active = st.checkbox(
+                    "Active",
+                    value=bool(o.get('is_active', 1)),
+                    key=f"hier_active_{o['id']}"
+                )
+                new_sub = st.selectbox(
+                    "Subscription tier",
+                    ['free', 'starter', 'growth', 'enterprise', 'client_direct'],
+                    index=['free','starter','growth','enterprise','client_direct'].index(
+                        o.get('subscription_tier', 'free')
+                    ) if o.get('subscription_tier', 'free') in ['free','starter','growth','enterprise','client_direct'] else 0,
+                    key=f"hier_sub_{o['id']}"
+                )
+            with col_m2:
+                notes_val = st.text_area(
+                    "Admin notes",
+                    value=o.get('notes') or '',
+                    height=80,
+                    key=f"hier_notes_{o['id']}"
+                )
+
+            if st.button("Save changes", key=f"hier_save_{o['id']}", type="primary"):
+                conn2 = get_connection()
+                conn2.execute("""
+                    UPDATE organisations
+                    SET is_active=?, subscription_tier=?, notes=?,
+                        suspended_at=?
+                    WHERE id=?
+                """, (
+                    int(new_active), new_sub, notes_val,
+                    None if new_active else datetime.utcnow().isoformat(),
+                    o['id']
+                ))
+                conn2.commit()
+                conn2.close()
+                st.success("Saved!")
+                st.rerun()
+
+
 # ── AI COSTS ──────────────────────────────────────────────────────────────────
 
 def _render_ai_costs(dark: bool = True):
@@ -499,6 +635,12 @@ def _render_new_org():
             org_name  = st.text_input("Organisation name *")
             slug      = st.text_input("Slug *",
                                        help="Lowercase letters and hyphens only")
+            org_type  = st.selectbox(
+                "Org type *",
+                ["agency", "freelance"],
+                format_func=lambda x: x.title(),
+                help="Agency = manages multiple clients. Freelance = independent team."
+            )
             tier      = st.selectbox("Plan tier", TIERS, index=1,
                                       format_func=lambda x: x.title())
         with col2:
@@ -531,28 +673,37 @@ def _render_new_org():
                 try:
                     cur = conn.execute("""
                         INSERT INTO organisations
-                            (name, slug, tier, ai_budget_usd, billing_day,
+                            (name, slug, tier, org_type, subscription_tier,
+                             subscription_status, ai_budget_usd, billing_day,
                              max_users, max_clients, max_leads,
-                             is_active, notes, created_at)
-                        VALUES (?,?,?,?,?,?,?,?,1,?,?)
-                    """, (org_name, slug.lower().strip(), tier,
+                             is_active, notes, created_at, onboarded_at)
+                        VALUES (?,?,?,?,?,
+                                'active',?,?,
+                                ?,?,?,
+                                1,?,?,?)
+                    """, (org_name, slug.lower().strip(), tier, org_type, tier,
                           budget, billing_day,
                           defaults[0], defaults[1], defaults[2],
-                          notes, now))
+                          notes, now, now))
                     new_org_id = cur.lastrowid
 
-                    import hashlib
-                    pw = hashlib.sha256(admin_pass.encode()).hexdigest()
+                    from core.auth import hash_password
+                    pw = hash_password(admin_pass)
                     conn.execute("""
                         INSERT INTO users
-                            (org_id, name, email, password, role, is_active, created_at)
-                        VALUES (?,?,?,?,'org_admin',1,?)
+                            (org_id, name, email, password, role,
+                             is_active, must_reset_password, created_at)
+                        VALUES (?,?,?,?,'org_admin',1,1,?)
                     """, (new_org_id, admin_name,
                           admin_email.lower().strip(), pw, now))
 
                     conn.commit()
-                    st.success(f"✅ Organisation '{org_name}' created! "
-                               f"Admin: {admin_email}")
+                    st.success(f"✅ Organisation '{org_name}' ({org_type}) created!")
+                    st.info(
+                        f"**Admin login credentials:**\n\n"
+                        f"Email: `{admin_email.lower().strip()}`\n\n"
+                        f"Password: `{admin_pass}` (they must reset on first login)"
+                    )
                 except Exception as e:
                     if "UNIQUE" in str(e):
                         st.error("Slug or email already exists.")

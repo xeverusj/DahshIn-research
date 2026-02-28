@@ -11,11 +11,12 @@ Org Admin workspace.
 import streamlit as st
 import hashlib
 from datetime import datetime, timezone, date
-from core.db import get_connection
+from core.db import get_connection, ROLES_BY_ORG_TYPE
 from core.auth import ROLE_LEVELS, INTERNAL_ROLES
 from services.invite_service import (
     create_invite, get_pending_invites, revoke_token,
 )
+from services.access_control import can_create_user
 
 def _rows(cursor_result):
     """Convert list of sqlite3.Row to list of dicts."""
@@ -120,6 +121,17 @@ INTERNAL_ROLE_OPTIONS = [
 ]
 CLIENT_ROLE_OPTIONS = ["client_user", "client_admin"]
 
+ROLE_DISPLAY = {
+    'org_admin':         'Admin',
+    'manager':           'Manager',
+    'research_manager':  'Research Manager',
+    'researcher':        'Researcher',
+    'campaign_manager':  'Campaign Manager',
+    'client_user':       'Client Viewer',
+    'client_admin':      'Client Admin',
+    'super_admin':       'Super Admin (Dashin)',
+}
+
 
 def render(user: dict):
     st.markdown(STYLES, unsafe_allow_html=True)
@@ -161,9 +173,10 @@ def render(user: dict):
     </div>
     """, unsafe_allow_html=True)
 
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "👥 Users",
         "🏢 Clients",
+        "🏛 Client Orgs",
         "🔗 Invite Links",
         "⚙️ Org Settings",
         "🧠 Site Library",
@@ -174,10 +187,12 @@ def render(user: dict):
     with tab2:
         _render_clients(org_id, user_id)
     with tab3:
-        _render_invites(org_id, user_id)
+        _render_client_orgs(org_id, user_id, user)
     with tab4:
-        _render_org_settings(org_id, org)
+        _render_invites(org_id, user_id)
     with tab5:
+        _render_org_settings(org_id, org)
+    with tab6:
         from dashboards.site_library_dashboard import render as render_site_lib
         # Admins can re-learn but not delete or mark stable (super_admin only)
         render_site_lib(user, allow_delete=False, allow_mark_stable=False)
@@ -238,12 +253,27 @@ def _render_users(org_id: int, user_id: int):
 
 
 def _render_edit_user(u: dict, org_id: int):
+    current_user = st.session_state.get('user', {})
+    creator_org_type = current_user.get('org_type', 'agency')
+    conn = get_connection()
+    target_org = conn.execute(
+        "SELECT org_type FROM organisations WHERE id=?", (org_id,)
+    ).fetchone()
+    conn.close()
+    edit_roles = ROLES_BY_ORG_TYPE.get(
+        target_org['org_type'] if target_org else creator_org_type,
+        INTERNAL_ROLE_OPTIONS
+    )
+    # Non-dashin creators cannot assign org_admin
+    if creator_org_type not in ('dashin',):
+        edit_roles = [r for r in edit_roles if r != 'org_admin']
+
     with st.form(f"edit_user_{u['id']}"):
         new_role = st.selectbox(
             "Role",
-            INTERNAL_ROLE_OPTIONS,
-            index=INTERNAL_ROLE_OPTIONS.index(u["role"])
-            if u["role"] in INTERNAL_ROLE_OPTIONS else 0,
+            edit_roles,
+            index=edit_roles.index(u["role"]) if u["role"] in edit_roles else 0,
+            format_func=lambda x: ROLE_DISPLAY.get(x, x.replace('_', ' ').title()),
             key=f"er_{u['id']}"
         )
         hourly = st.number_input(
@@ -269,7 +299,28 @@ def _render_edit_user(u: dict, org_id: int):
 
 
 def _render_add_user(org_id: int):
-    conn    = get_connection()
+    current_user = st.session_state.get('user', {})
+    creator_org_type = current_user.get('org_type', 'agency')
+
+    # Determine which roles are valid for this org type
+    available_roles = ROLES_BY_ORG_TYPE.get(creator_org_type, INTERNAL_ROLE_OPTIONS)
+
+    # super_admin / dashin admins adding to this org — use the target org's type
+    conn = get_connection()
+    target_org = conn.execute(
+        "SELECT org_type FROM organisations WHERE id=?", (org_id,)
+    ).fetchone()
+    conn.close()
+    if target_org:
+        available_roles = ROLES_BY_ORG_TYPE.get(target_org['org_type'], INTERNAL_ROLE_OPTIONS)
+
+    # Never expose org_admin to non-dashin creators (they must contact Dashin)
+    if creator_org_type not in ('dashin',) and 'org_admin' in available_roles:
+        available_roles = [r for r in available_roles if r != 'org_admin']
+
+    role_display = [ROLE_DISPLAY.get(r, r.replace('_', ' ').title()) for r in available_roles]
+
+    conn = get_connection()
     clients = conn.execute(
         "SELECT id, name FROM clients WHERE org_id=? AND is_active=1",
         (org_id,)
@@ -284,9 +335,8 @@ def _render_add_user(org_id: int):
         with col2:
             password = st.text_input("Password *", type="password",
                                      help="Min 8 characters")
-            role     = st.selectbox("Role", INTERNAL_ROLE_OPTIONS,
-                                    format_func=lambda x:
-                                    x.replace("_"," ").title())
+            selected_display = st.selectbox("Role", role_display)
+            role = available_roles[role_display.index(selected_display)]
 
         hourly = st.number_input("Hourly rate (£)", min_value=0.0,
                                   value=0.0, step=0.5)
@@ -297,26 +347,32 @@ def _render_add_user(org_id: int):
             elif len(password) < 8:
                 st.error("Password must be at least 8 characters.")
             else:
-                try:
-                    pw   = hashlib.sha256(password.encode()).hexdigest()
-                    conn = get_connection()
-                    conn.execute("""
-                        INSERT INTO users
-                            (org_id, name, email, password, role,
-                             hourly_rate, is_active, created_at)
-                        VALUES (?,?,?,?,?,?,1,?)
-                    """, (org_id, name, email.lower().strip(),
-                          pw, role, hourly,
-                          datetime.now(timezone.utc).replace(tzinfo=None).isoformat()))
-                    conn.commit()
-                    conn.close()
-                    st.success(f"User {name} created!")
-                    st.rerun()
-                except Exception as e:
-                    if "UNIQUE" in str(e):
-                        st.error("That email is already registered.")
-                    else:
-                        st.error(f"Error: {e}")
+                # Validate against access control
+                allowed, reason = can_create_user(current_user, role, org_id)
+                if not allowed:
+                    st.error(f"Permission denied: {reason}")
+                else:
+                    try:
+                        from core.auth import hash_password
+                        pw   = hash_password(password)
+                        conn = get_connection()
+                        conn.execute("""
+                            INSERT INTO users
+                                (org_id, name, email, password, role,
+                                 hourly_rate, is_active, created_at)
+                            VALUES (?,?,?,?,?,?,1,?)
+                        """, (org_id, name, email.lower().strip(),
+                              pw, role, hourly,
+                              datetime.now(timezone.utc).replace(tzinfo=None).isoformat()))
+                        conn.commit()
+                        conn.close()
+                        st.success(f"User {name} created as {ROLE_DISPLAY.get(role, role)}!")
+                        st.rerun()
+                    except Exception as e:
+                        if "UNIQUE" in str(e):
+                            st.error("That email is already registered.")
+                        else:
+                            st.error(f"Error: {e}")
 
 
 # ── CLIENTS ───────────────────────────────────────────────────────────────────
@@ -505,6 +561,162 @@ def _render_invites(org_id: int, user_id: int):
                     "It works once and expires in "
                     f"{expiry_days} days.")
             st.rerun()
+
+
+# ── CLIENT ORGS ───────────────────────────────────────────────────────────────
+
+def _render_client_orgs(org_id: int, user_id: int, user: dict):
+    """
+    Manage client organisations that are children of this agency.
+    Creates org_type='client' entries linked via parent_org_id.
+    """
+    st.markdown("### Client Organisations")
+    st.caption(
+        "Client orgs are separate portal accounts for your clients. "
+        "They see only leads released to them."
+    )
+
+    conn = get_connection()
+    child_orgs = conn.execute("""
+        SELECT o.*,
+               (SELECT COUNT(*) FROM leads WHERE org_id=o.id) AS lead_count,
+               (SELECT COUNT(*) FROM campaigns ca
+                JOIN clients cl ON cl.id=ca.client_id
+                WHERE cl.org_id=o.id AND ca.status NOT IN ('cancelled','closed')) AS active_campaigns,
+               (SELECT COUNT(*) FROM users WHERE org_id=o.id AND is_active=1) AS user_count
+        FROM organisations o
+        WHERE o.parent_org_id=? AND o.org_type='client'
+        ORDER BY o.created_at DESC
+    """, (org_id,)).fetchall()
+    conn.close()
+
+    # Show existing client orgs
+    if child_orgs:
+        st.markdown(f"**{len(child_orgs)} client organisation(s)**")
+        for co in child_orgs:
+            status_icon = "🟢" if co['is_active'] else "🔴"
+            sub_tier = co.get('subscription_tier', 'client_direct')
+            st.markdown(f"""
+            <div class="client-card">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                    <div>
+                        <div class="client-name">{status_icon} {co['name']}</div>
+                        <div class="client-meta">
+                            Type: Client Org ·
+                            Tier: {sub_tier.replace('_',' ').title()} ·
+                            👥 {co['user_count']} users ·
+                            🧑 {co['lead_count']:,} leads ·
+                            📁 {co['active_campaigns']} active campaigns
+                        </div>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            with st.expander(f"Manage — {co['name']}"):
+                with st.form(f"edit_client_org_{co['id']}"):
+                    cname = st.text_input("Organisation name", value=co['name'])
+                    cactive = st.checkbox("Active", value=bool(co['is_active']))
+                    if st.form_submit_button("Save"):
+                        conn2 = get_connection()
+                        conn2.execute(
+                            "UPDATE organisations SET name=?, is_active=? WHERE id=? AND parent_org_id=?",
+                            (cname, int(cactive), co['id'], org_id)
+                        )
+                        conn2.commit()
+                        conn2.close()
+                        st.success("Saved!")
+                        st.rerun()
+    else:
+        st.info("No client organisations yet. Create one below.")
+
+    st.markdown("---")
+    st.subheader("Add Client Organisation")
+    st.caption(
+        "This creates a separate login portal for your client. "
+        "They'll only see leads you release to them."
+    )
+
+    with st.form("add_client_org_form"):
+        col1, col2 = st.columns(2)
+        with col1:
+            co_name        = st.text_input("Organisation name *",
+                                            placeholder="Acme Insurance Ltd")
+            contact_name   = st.text_input("Primary contact name *",
+                                            placeholder="Jane Smith")
+        with col2:
+            contact_email  = st.text_input("Primary contact email *",
+                                            placeholder="jane@acme.com",
+                                            help="This becomes their login email")
+            sub_type       = st.selectbox(
+                "Subscription type",
+                ["Via our agency", "Has own Dashin subscription"],
+                help="'Via our agency' creates a new client portal. "
+                     "'Has own Dashin subscription' links an existing account."
+            )
+
+        temp_password = st.text_input(
+            "Temporary password *", type="password",
+            help="They will be prompted to change this on first login"
+        )
+
+        if st.form_submit_button("Create Client Org", use_container_width=True):
+            errors = []
+            if not co_name.strip():      errors.append("Organisation name is required.")
+            if not contact_name.strip(): errors.append("Contact name is required.")
+            if not contact_email.strip(): errors.append("Contact email is required.")
+            if not temp_password or len(temp_password) < 8:
+                errors.append("Temporary password must be at least 8 characters.")
+
+            if errors:
+                for e in errors:
+                    st.error(e)
+            else:
+                try:
+                    import re as _re2
+                    slug_base = _re2.sub(r'[^a-z0-9]', '-', co_name.lower().strip())
+                    conn3 = get_connection()
+
+                    # Create the client org
+                    cur = conn3.execute("""
+                        INSERT INTO organisations
+                            (name, slug, tier, org_type, parent_org_id,
+                             subscription_tier, subscription_status,
+                             ai_budget_usd, max_users, max_clients, max_leads,
+                             is_active, onboarded_by, onboarded_at)
+                        VALUES (?, ?, 'starter', 'client', ?,
+                                'client_direct', 'active',
+                                0, 3, 0, 100000,
+                                1, ?, datetime('now'))
+                    """, (co_name.strip(), slug_base, org_id, user_id))
+                    new_org_id = cur.lastrowid
+
+                    # Create the client_admin user
+                    from core.auth import hash_password
+                    pw_hash = hash_password(temp_password)
+                    conn3.execute("""
+                        INSERT INTO users
+                            (org_id, name, email, password, role,
+                             is_active, must_reset_password, created_at)
+                        VALUES (?, ?, ?, ?, 'client_admin', 1, 1, datetime('now'))
+                    """, (new_org_id, contact_name.strip(),
+                          contact_email.lower().strip(), pw_hash))
+
+                    conn3.commit()
+                    conn3.close()
+
+                    st.success(f"✅ Client org '{co_name}' created!")
+                    st.info(
+                        f"**Login credentials for {contact_name}:**\n\n"
+                        f"Email: `{contact_email.lower().strip()}`\n\n"
+                        f"Temporary password: `{temp_password}`\n\n"
+                        f"They will be asked to change their password on first login."
+                    )
+                    st.rerun()
+                except Exception as ex:
+                    if "UNIQUE" in str(ex):
+                        st.error("That email or organisation slug is already registered.")
+                    else:
+                        st.error(f"Error creating client org: {ex}")
 
 
 # ── ORG SETTINGS ─────────────────────────────────────────────────────────────

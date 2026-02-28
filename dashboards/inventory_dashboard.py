@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from core.db import get_connection, init_db
+from services.access_control import get_visible_leads_query, get_visible_org_ids
 
 def _safe_row(row):
     """Convert sqlite3.Row or dict to dict safely. Handles both db.py versions."""
@@ -145,11 +146,22 @@ def persona_badge(p):
            "Influencer":"p-inf","IC":"p-ic"}.get(p,"p-unk")
     return f'<span class="badge {cls}">{p or "Unknown"}</span>'
 
-def get_stats(org_id=None):
+def get_stats(org_id=None, user=None):
     conn = get_connection()
     out = {}
-    org_clause = "AND org_id=?" if org_id else ""
-    org_param  = [org_id] if org_id else []
+
+    # Build the visibility filter
+    if user:
+        vis_where, vis_params = get_visible_leads_query(user)
+        org_clause = f"AND ({vis_where})"
+        org_param  = vis_params
+    elif org_id:
+        org_clause = "AND org_id=?"
+        org_param  = [org_id]
+    else:
+        org_clause = ""
+        org_param  = []
+
     for s in ["new","assigned","in_progress","enriched","used","archived"]:
         row = conn.execute(
             f"SELECT COUNT(*) AS cnt FROM leads WHERE status=? {org_clause}",
@@ -166,11 +178,18 @@ def get_stats(org_id=None):
     return out
 
 def get_leads(status=None, persona=None, search=None, industry=None,
-              list_id=None, page=1, per_page=40, org_id=None):
+              list_id=None, page=1, per_page=40, org_id=None, user=None):
     conn = get_connection()
     where, params = [], []
-    if org_id:
+
+    # Use access control if user context is provided
+    if user:
+        vis_where, vis_params = get_visible_leads_query(user)
+        where.append(f"({vis_where})")
+        params.extend(vis_params)
+    elif org_id:
         where.append("l.org_id=?"); params.append(org_id)
+
     if status and status != "all":
         where.append("l.status=?"); params.append(status)
     if persona and persona != "all":
@@ -597,7 +616,6 @@ def render_leads_table(user):
     list_id = st.session_state.get("inv_list_filter")
     page    = st.session_state.get("inv_page", 1)
 
-    org_id = (user or {}).get("org_id")
     leads, total = get_leads(
         status  = status  if status  != "all" else None,
         persona = persona if persona != "all" else None,
@@ -605,7 +623,7 @@ def render_leads_table(user):
         industry= industry if industry != "all" else None,
         list_id = list_id,
         page    = page,
-        org_id  = org_id,
+        user    = user,   # use access_control for org visibility
     )
 
     per_page = 40
@@ -1859,10 +1877,9 @@ def render(user):
     st.markdown('<div class="page-title">Inventory</div>', unsafe_allow_html=True)
     st.markdown('<div class="page-sub">Your global lead database — browse, filter, archive, and check client conflicts.</div>', unsafe_allow_html=True)
 
-    # Stats
-    _org_id = (user or {}).get("org_id")
+    # Stats — use access control layer for org visibility
     try:
-        s = get_stats(org_id=_org_id)
+        s = get_stats(user=user)
     except Exception:
         s = {k:0 for k in ["total","new","enriched","used","archived","reusable"]}
 

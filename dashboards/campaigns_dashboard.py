@@ -18,77 +18,7 @@ from services.notification_service import notify_campaign_ready
 
 STYLES = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
-
-.stApp { background: #F7F6F3; font-family: 'Outfit', sans-serif; }
-section[data-testid="stSidebar"] { background: #1A1917 !important; }
-section[data-testid="stSidebar"] * { color: #E8E6E1 !important; }
-
-.cb-header {
-    background: #1A1917;
-    border-radius: 10px;
-    padding: 22px 28px;
-    color: #F7F6F3;
-    margin-bottom: 24px;
-}
-.cb-title { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
-.cb-sub   { font-size: 12px; color: #888; margin-top: 4px; }
-
-.camp-card {
-    background: white;
-    border: 1px solid #E8E6E1;
-    border-radius: 10px;
-    padding: 18px 22px;
-    margin-bottom: 12px;
-}
-.camp-title  { font-size: 17px; font-weight: 700; color: #1A1917; }
-.camp-client { font-size: 12px; color: #C9A96E; font-weight: 600;
-               text-transform: uppercase; letter-spacing: 0.5px; }
-.camp-meta   { font-size: 12px; color: #888; margin-top: 6px; }
-
-.status-badge {
-    display: inline-block;
-    padding: 3px 12px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-}
-.s-building  { background:#E3F2FD; color:#0D47A1; }
-.s-active    { background:#E8F5E9; color:#1B5E20; }
-.s-paused    { background:#FFF3E0; color:#E65100; }
-.s-ready     { background:#C8E6C9; color:#1B5E20; }
-.s-completed { background:#F3E5F5; color:#4A148C; }
-.s-closed    { background:#F5F5F5; color:#555; }
-
-.ready-banner {
-    background: linear-gradient(135deg, #E8F5E9, #F1F8E9);
-    border: 2px solid #4CAF50;
-    border-radius: 8px;
-    padding: 14px 18px;
-    margin: 10px 0;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-.not-ready-banner {
-    background: #FFFBF0;
-    border: 1px dashed #C9A96E;
-    border-radius: 8px;
-    padding: 14px 18px;
-    margin: 10px 0;
-}
-
-.lead-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 0;
-    border-bottom: 1px solid #F0EDE8;
-    font-size: 13px;
-}
-.lead-row:last-child { border-bottom: none; }
+/* Campaign-specific banners and rows — shared components in core/styles.py */
 </style>
 """
 
@@ -97,6 +27,8 @@ CAMPAIGN_STATUSES = ["building", "active", "paused", "ready",
 
 
 def render(user: dict):
+    from core.styles import inject_shared_css
+    inject_shared_css()
     st.markdown(STYLES, unsafe_allow_html=True)
 
     org_id  = user["org_id"]

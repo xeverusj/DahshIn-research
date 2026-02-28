@@ -28,77 +28,14 @@ def _row(cursor_result):
 
 STYLES = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
-
-.stApp { background: #F5F4F0; font-family: 'IBM Plex Sans', sans-serif; }
-section[data-testid="stSidebar"] { background: #111 !important; }
-section[data-testid="stSidebar"] * { color: #DDD !important; }
-
-.est-header {
-    background: #111;
-    border-radius: 10px;
-    padding: 22px 28px;
-    color: #F5F4F0;
-    margin-bottom: 24px;
-}
-.est-title { font-size: 20px; font-weight: 600; }
-.est-sub {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 11px;
-    color: #666;
-    margin-top: 4px;
-}
-
-.cost-card {
-    background: white;
-    border: 1px solid #E8E6E1;
-    border-radius: 8px;
-    padding: 18px;
-    text-align: center;
-}
-.cost-num {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 28px;
-    font-weight: 600;
-    color: #1A1917;
-}
-.cost-num.green { color: #2E7D32; }
-.cost-num.gold  { color: #C9A96E; }
-.cost-label {
-    font-size: 11px;
-    color: #999;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-top: 4px;
-}
-
-.breakdown-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 0;
-    border-bottom: 1px solid #F0EDE8;
-    font-size: 13px;
-}
-.breakdown-row:last-child { border-bottom: none; }
-
-.ai-usage-bar {
-    background: #F0EDE8;
-    border-radius: 4px;
-    height: 8px;
-    overflow: hidden;
-    margin-top: 6px;
-}
-.ai-usage-fill {
-    height: 100%;
-    border-radius: 4px;
-    background: linear-gradient(90deg, #C9A96E, #E8C98A);
-}
+/* Estimator-specific — shared components in core/styles.py */
 </style>
 """
 
 
 def render(user: dict):
+    from core.styles import inject_shared_css
+    inject_shared_css()
     st.markdown(STYLES, unsafe_allow_html=True)
 
     org_id = user["org_id"]

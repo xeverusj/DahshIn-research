@@ -75,18 +75,16 @@ st.set_page_config(
 )
 
 # ── GLOBAL CSS ────────────────────────────────────────────────────────────────
+# Shared design system (fonts, variables, all shared components) — core/styles.py
+from core.styles import inject_shared_css
+inject_shared_css()
+
+# Sidebar + app-chrome CSS — not shared with dashboards
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@700&display=swap');
-
-/* Base */
-html, body, [class*="css"] {
-    font-family: 'Inter', sans-serif !important;
-    background: #F7F6F3 !important;
-}
 #MainMenu, footer, header, .stDeployButton { visibility: hidden; }
 
-/* Sidebar */
+/* Sidebar shell */
 section[data-testid="stSidebar"] {
     background: #111111 !important;
     min-width: 220px !important;
@@ -116,49 +114,6 @@ section[data-testid="stSidebar"] .stRadio label {
 section[data-testid="stSidebar"] .stRadio label:hover {
     background: #1E1E1E !important;
     color: #DDD !important;
-}
-
-/* Main content area */
-.main .block-container {
-    padding: 2rem 2.5rem !important;
-    max-width: 1280px !important;
-    background: #F7F6F3 !important;
-}
-
-/* Buttons */
-div.stButton > button {
-    border-radius: 7px !important;
-    font-family: 'Inter', sans-serif !important;
-    font-weight: 600 !important;
-    font-size: 13px !important;
-    transition: all .15s !important;
-}
-div.stButton > button[kind="primary"] {
-    background: #1A1917 !important;
-    color: #FFF !important;
-    border: none !important;
-}
-div.stButton > button[kind="primary"]:hover {
-    background: #C9A96E !important;
-}
-div.stButton > button[kind="secondary"] {
-    background: transparent !important;
-    color: #1A1917 !important;
-    border: 1px solid #D0CCC5 !important;
-}
-
-/* Text inputs */
-div.stTextInput input {
-    border: 1px solid #E0DBD4 !important;
-    border-radius: 7px !important;
-    background: #FAF9F7 !important;
-    font-size: 13px !important;
-    padding: 10px 14px !important;
-    color: #1A1917 !important;
-}
-div.stTextInput input:focus {
-    border-color: #C9A96E !important;
-    box-shadow: 0 0 0 3px rgba(201,169,110,.12) !important;
 }
 
 /* Sidebar components */
@@ -192,14 +147,14 @@ div.stTextInput input:focus {
     text-transform: uppercase;
     margin-top: 2px;
 }
-.sb-role-super_admin     { background:rgba(201,169,110,.2); color:#C9A96E; }
-.sb-role-org_admin       { background:rgba(201,169,110,.15); color:#B8943C; }
-.sb-role-manager         { background:rgba(100,160,255,.15); color:#64A0FF; }
-.sb-role-research_manager{ background:rgba(180,100,255,.15); color:#B464FF; }
-.sb-role-campaign_manager{ background:rgba(255,160,50,.15);  color:#FFA032; }
-.sb-role-researcher      { background:rgba(100,200,130,.15); color:#64C882; }
-.sb-role-client_admin    { background:rgba(255,100,100,.15); color:#FF6464; }
-.sb-role-client_user     { background:rgba(255,180,50,.15);  color:#FFB432; }
+.sb-role-super_admin      { background:rgba(201,169,110,.2);  color:#C9A96E; }
+.sb-role-org_admin        { background:rgba(201,169,110,.15); color:#B8943C; }
+.sb-role-manager          { background:rgba(74,108,247,.15);  color:#6A8CF7; }
+.sb-role-research_manager { background:rgba(124,58,237,.15);  color:#9A64E8; }
+.sb-role-campaign_manager { background:rgba(180,83,9,.15);    color:#D07030; }
+.sb-role-researcher       { background:rgba(61,158,106,.15);  color:#5AAE82; }
+.sb-role-client_admin     { background:rgba(212,80,80,.15);   color:#E06464; }
+.sb-role-client_user      { background:rgba(184,148,60,.15);  color:#C09830; }
 
 .sb-org {
     font-size: 10px;
@@ -207,13 +162,11 @@ div.stTextInput input:focus {
     font-style: italic;
     margin-top: 2px;
 }
-
 .sb-div {
     border: none;
     border-top: 1px solid #1E1E1E;
     margin: 12px 0;
 }
-
 .sb-notif {
     background: #C9A96E;
     color: #111;

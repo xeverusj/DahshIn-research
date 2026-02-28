@@ -32,155 +32,9 @@ TIER_LIMITS = {
 
 # ── THEME ─────────────────────────────────────────────────────────────────────
 
-DARK_CSS = """
-<style>
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@300;400;600;700&display=swap');
+DARK_CSS = ""  # Dark mode handled by core/theme.py
 
-.stApp { background: #0D0D0D !important; font-family: 'Manrope', sans-serif; color: #F0EDE8; }
-.main .block-container { background: #0D0D0D !important; }
-
-/* Force text colour in dark mode */
-.stApp p, .stApp label, .stApp span, .stApp div { color: #C8C4BE; }
-.stApp h1,.stApp h2,.stApp h3 { color: #F0EDE8 !important; }
-
-/* Metrics */
-div[data-testid="metric-container"] {
-    background: #1A1A1A !important;
-    border: 1px solid #2A2A2A !important;
-    border-radius: 8px !important;
-    padding: 14px !important;
-}
-div[data-testid="metric-container"] label { color: #777 !important; }
-div[data-testid="metric-container"] div[data-testid="stMetricValue"] { color: #F0EDE8 !important; }
-
-/* Selectbox, inputs */
-div[data-baseweb="select"] > div { background: #1A1A1A !important; border-color: #333 !important; }
-div.stTextInput input, div.stTextArea textarea, div.stNumberInput input {
-    background: #1A1A1A !important;
-    border-color: #333 !important;
-    color: #F0EDE8 !important;
-}
-div.stCheckbox label span { color: #C8C4BE !important; }
-
-/* Expander */
-details { background: #1A1A1A !important; border-color: #2A2A2A !important; }
-details summary { color: #C9A96E !important; }
-
-/* Tabs */
-button[data-baseweb="tab"] { color: #777 !important; }
-button[data-baseweb="tab"][aria-selected="true"] { color: #C9A96E !important; border-bottom-color: #C9A96E !important; }
-
-/* Dataframe */
-div[data-testid="stDataFrame"] { background: #1A1A1A !important; }
-
-/* Caption */
-div[data-testid="stCaptionContainer"] { color: #666 !important; }
-
-.sa-header {
-    background: linear-gradient(135deg, #141414, #1E1E1E);
-    border: 1px solid #2A2A2A;
-    border-radius: 10px;
-    padding: 24px 28px;
-    margin-bottom: 24px;
-}
-.sa-title { font-family: 'JetBrains Mono', monospace; font-size: 18px;
-            font-weight: 600; color: #F0EDE8; letter-spacing: -0.3px; }
-.sa-badge { background: #C9A96E; color: #0A0A0A; padding: 3px 12px;
-            border-radius: 20px; font-size: 11px; font-weight: 700;
-            letter-spacing: 1px; text-transform: uppercase; }
-.sa-sub   { font-size: 12px; color: #555; margin-top: 4px; }
-
-.org-card { background: #141414; border: 1px solid #2A2A2A;
-            border-radius: 8px; padding: 16px 20px; margin-bottom: 10px; }
-.org-card:hover { border-color: #444; }
-.org-name  { font-weight: 700; font-size: 15px; color: #F0EDE8; }
-.org-meta  { font-size: 12px; color: #555; margin-top: 4px;
-             font-family: 'JetBrains Mono', monospace; }
-
-.tier-chip { display:inline-block; padding:2px 10px; border-radius:12px;
-             font-size:11px; font-weight:700; text-transform:uppercase; }
-.tier-scraper    { background:#1A1A2E; color:#4FC3F7; }
-.tier-starter    { background:#1A2E1A; color:#81C784; }
-.tier-growth     { background:#2E1A1A; color:#FFB74D; }
-.tier-agency     { background:#2A1A2E; color:#CE93D8; }
-.tier-enterprise { background:#2E2A1A; color:#C9A96E; }
-
-.ai-bar-wrap { background:#1E1E1E; border-radius:4px; height:6px;
-               margin-top:8px; overflow:hidden; }
-.ai-bar-fill { height:100%; border-radius:4px; transition:width 0.3s; }
-.ai-green  { background:#4CAF50; }
-.ai-yellow { background:#FFC107; }
-.ai-red    { background:#F44336; }
-
-.platform-stat { background:#141414; border:1px solid #2A2A2A;
-                 border-radius:8px; padding:18px; text-align:center; }
-.platform-num  { font-family:'JetBrains Mono',monospace; font-size:28px;
-                 font-weight:600; color:#C9A96E; }
-.platform-label { font-size:11px; color:#555; text-transform:uppercase;
-                  letter-spacing:0.5px; margin-top:4px; }
-</style>
-"""
-
-LIGHT_CSS = """
-<style>
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@300;400;600;700&display=swap');
-
-.stApp { background: #F7F6F3 !important; font-family: 'Manrope', sans-serif; color: #1A1917; }
-.main .block-container { background: #F7F6F3 !important; }
-
-.stApp h1,.stApp h2,.stApp h3 { color: #1A1917 !important; }
-
-div[data-testid="metric-container"] {
-    background: #FFFFFF !important;
-    border: 1px solid #E8E6E1 !important;
-    border-radius: 8px !important;
-    padding: 14px !important;
-}
-
-.sa-header {
-    background: linear-gradient(135deg, #1A1917, #2C2A27);
-    border-radius: 10px;
-    padding: 24px 28px;
-    margin-bottom: 24px;
-    color: #F0EDE8;
-}
-.sa-title { font-family: 'JetBrains Mono', monospace; font-size: 18px;
-            font-weight: 600; color: #F0EDE8; letter-spacing: -0.3px; }
-.sa-badge { background: #C9A96E; color: #1A1917; padding: 3px 12px;
-            border-radius: 20px; font-size: 11px; font-weight: 700;
-            letter-spacing: 1px; text-transform: uppercase; }
-.sa-sub   { font-size: 12px; color: #AAA; margin-top: 4px; }
-
-.org-card { background: #FFFFFF; border: 1px solid #E8E6E1;
-            border-radius: 8px; padding: 16px 20px; margin-bottom: 10px; }
-.org-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
-.org-name  { font-weight: 700; font-size: 15px; color: #1A1917; }
-.org-meta  { font-size: 12px; color: #888; margin-top: 4px;
-             font-family: 'JetBrains Mono', monospace; }
-
-.tier-chip { display:inline-block; padding:2px 10px; border-radius:12px;
-             font-size:11px; font-weight:700; text-transform:uppercase; }
-.tier-scraper    { background:#E3F2FD; color:#0277BD; }
-.tier-starter    { background:#E8F5E9; color:#2E7D32; }
-.tier-growth     { background:#FFF3E0; color:#E65100; }
-.tier-agency     { background:#F3E5F5; color:#6A1B9A; }
-.tier-enterprise { background:#FFF8E1; color:#8D6E0A; }
-
-.ai-bar-wrap { background:#F0EDE8; border-radius:4px; height:6px;
-               margin-top:8px; overflow:hidden; }
-.ai-bar-fill { height:100%; border-radius:4px; transition:width 0.3s; }
-.ai-green  { background:#4CAF50; }
-.ai-yellow { background:#FFC107; }
-.ai-red    { background:#F44336; }
-
-.platform-stat { background:#FFFFFF; border:1px solid #E8E6E1;
-                 border-radius:8px; padding:18px; text-align:center; }
-.platform-num  { font-family:'JetBrains Mono',monospace; font-size:28px;
-                 font-weight:600; color:#C9A96E; }
-.platform-label { font-size:11px; color:#999; text-transform:uppercase;
-                  letter-spacing:0.5px; margin-top:4px; }
-</style>
-"""
+LIGHT_CSS = ""  # Light mode handled by core/theme.py
 
 
 def _r(row):
@@ -193,33 +47,23 @@ def _r(row):
 
 
 def render(user: dict):
-    # ── Theme toggle ──────────────────────────────────────────────────
-    if "sa_dark_mode" not in st.session_state:
-        st.session_state["sa_dark_mode"] = True
+    from core.styles import inject_shared_css
+    inject_shared_css()
+    # ── Theme — reads shared key set by app.py sidebar toggle ─────────
+    dark = st.session_state.get("dark_mode", False)
+    # Inject dashboard-specific component styles (org cards, tier chips, etc.)
 
-    dark = st.session_state["sa_dark_mode"]
-    st.markdown(DARK_CSS if dark else LIGHT_CSS, unsafe_allow_html=True)
-
-    # Toggle button in top-right via columns
-    header_col, toggle_col = st.columns([8, 1])
-    with toggle_col:
-        label = "☀ Light" if dark else "🌙 Dark"
-        if st.button(label, key="theme_toggle", use_container_width=True):
-            st.session_state["sa_dark_mode"] = not dark
-            st.rerun()
-
-    with header_col:
-        st.markdown(f"""
-        <div class="sa-header">
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-                <div>
-                    <div class="sa-title">⚡ Dashin Platform</div>
-                    <div class="sa-sub">Super Admin · {date.today().strftime('%d %b %Y')}</div>
-                </div>
-                <span class="sa-badge">Super Admin</span>
+    st.markdown(f"""
+    <div class="sa-header">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+                <div class="sa-title">⚡ Dashin Platform</div>
+                <div class="sa-sub">Super Admin · {date.today().strftime('%d %b %Y')}</div>
             </div>
+            <span class="sa-badge">Super Admin</span>
         </div>
-        """, unsafe_allow_html=True)
+    </div>
+    """, unsafe_allow_html=True)
 
     tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
         "🏢 All Orgs",

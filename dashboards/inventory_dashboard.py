@@ -27,105 +27,19 @@ def _safe_row(row):
 # ── STYLE ─────────────────────────────────────────────────────────────────────
 CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Outfit:wght@300;400;500;600;700&display=swap');
-html,body,[class*="css"]{font-family:'Outfit',sans-serif!important}
-
-.page-title{font-family:'Playfair Display',serif;font-size:28px;font-weight:700;
-  color:#1a1917;letter-spacing:-.5px;margin-bottom:4px}
-.page-sub{font-size:13px;color:#999;margin-bottom:24px}
-
-/* Stat bar */
-.stat-row{display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap}
-.stat-card{flex:1;min-width:130px;background:#fff;border:1px solid #e8e4dd;
-  border-radius:10px;padding:16px 18px}
-.stat-val{font-family:'Playfair Display',serif;font-size:26px;font-weight:700;color:#1a1917}
-.stat-label{font-size:10px;color:#aaa;text-transform:uppercase;letter-spacing:1.2px;
-  margin-top:3px;font-weight:600}
-.stat-note{font-size:11px;margin-top:4px;font-weight:600}
-.note-green{color:#3d9e6a} .note-gold{color:#c9a96e} .note-blue{color:#4a6cf7}
-.note-red{color:#d45050}   .note-grey{color:#aaa}
-
-/* Filters bar */
-.filter-bar{background:#fff;border:1px solid #e8e4dd;border-radius:10px;
-  padding:16px 20px;margin-bottom:20px}
-
-/* Section header */
-.sec-hd{font-family:'Playfair Display',serif;font-size:17px;font-weight:700;
-  color:#1a1917;margin:24px 0 12px;padding-bottom:8px;border-bottom:1px solid #e8e4dd;
-  display:flex;align-items:center;justify-content:space-between}
-
-/* Lead table */
-.tbl{background:#fff;border:1px solid #e8e4dd;border-radius:10px;overflow:hidden;margin-bottom:24px}
-.tbl table{width:100%;border-collapse:collapse;font-size:12px}
-.tbl th{background:#f8f7f4;padding:10px 14px;text-align:left;font-size:10px;
-  font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:1.2px;
-  border-bottom:1px solid #e8e4dd}
-.tbl td{padding:10px 14px;border-bottom:1px solid #f0ede8;color:#666;vertical-align:middle}
-.tbl td.n{color:#1a1917;font-weight:600;font-size:13px}
-.tbl td.co{color:#555;font-weight:500}
-.tbl tr:last-child td{border-bottom:none}
-.tbl tr:hover td{background:#faf9f7;cursor:pointer}
-
-/* Badges */
-.badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:9px;font-weight:700;letter-spacing:.4px}
-.b-new      {background:#f0f4ff;color:#4a6cf7;border:1px solid #c0ceff}
-.b-assigned {background:#fff8ec;color:#c9a96e;border:1px solid #e8d5a8}
-.b-progress {background:#f3f0ff;color:#7c3aed;border:1px solid #d0c0ff}
-.b-enriched {background:#ecf7f0;color:#3d9e6a;border:1px solid #b8dfc8}
-.b-used     {background:#f5f5f5;color:#888;border:1px solid #ddd}
-.b-archived {background:#1a1917;color:#c9a96e;border:1px solid #3a3530}
-
-/* Persona badges */
-.p-dm  {background:rgba(212,80,80,.1);color:#d45050}
-.p-si  {background:rgba(201,169,110,.1);color:#c9a96e}
-.p-inf {background:rgba(74,108,247,.1);color:#4a6cf7}
-.p-ic  {background:rgba(100,200,130,.1);color:#3d9e6a}
-.p-unk {background:#f5f5f5;color:#aaa}
-
-/* Detail panel */
-.detail-panel{background:#fff;border:1px solid #e8e4dd;border-radius:10px;padding:24px;margin-bottom:16px}
-.detail-name{font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#1a1917;margin-bottom:4px}
-.detail-sub{font-size:13px;color:#888;margin-bottom:20px}
-.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
-.detail-field{background:#f8f7f4;border-radius:7px;padding:12px 14px}
-.detail-field-label{font-size:9px;color:#aaa;text-transform:uppercase;letter-spacing:1.2px;font-weight:700;margin-bottom:4px}
-.detail-field-val{font-size:13px;color:#1a1917;font-weight:500}
-
-/* Archive list cards */
-.list-card{background:#fff;border:1px solid #e8e4dd;border-radius:10px;padding:18px 20px;margin-bottom:10px}
-.list-card-name{font-family:'Playfair Display',serif;font-size:15px;font-weight:700;color:#1a1917;margin-bottom:2px}
-.list-card-meta{font-size:11px;color:#aaa;margin-bottom:8px}
-.list-card-desc{font-size:12px;color:#666;line-height:1.5}
-
-/* Client conflict warning */
-.conflict-warn{background:#fdecea;border:1px solid #f0b8b8;border-left:3px solid #d45050;
-  border-radius:6px;padding:10px 14px;font-size:12px;color:#d45050;margin:8px 0}
-.conflict-ok{background:#ecf7f0;border:1px solid #b8dfc8;border-left:3px solid #3d9e6a;
-  border-radius:6px;padding:10px 14px;font-size:12px;color:#3d9e6a;margin:8px 0}
-
-/* Buttons */
-div.stButton>button{border-radius:7px!important;font-family:'Outfit',sans-serif!important;
-  font-weight:600!important;font-size:12px!important}
-div.stButton>button[kind="primary"]{background:#1a1917!important;color:#fff!important;border:none!important}
-div.stButton>button[kind="primary"]:hover{background:#c9a96e!important}
-div.stButton>button[kind="secondary"]{background:transparent!important;color:#1a1917!important;
-  border:1px solid #d0ccc5!important}
-div.stSelectbox>div>div{border:1px solid #e0dbd4!important;border-radius:7px!important;
-  background:#faf9f7!important;font-size:13px!important}
-div.stTextInput input{border:1px solid #e0dbd4!important;border-radius:7px!important;
-  background:#faf9f7!important;font-size:13px!important;padding:10px 14px!important}
-div.stTextInput input:focus{border-color:#c9a96e!important;
-  box-shadow:0 0 0 3px rgba(201,169,110,.12)!important}
-div.stTextArea textarea{border:1px solid #e0dbd4!important;border-radius:7px!important;
-  background:#faf9f7!important;font-size:13px!important}
-div.stMultiSelect>div>div{border:1px solid #e0dbd4!important;border-radius:7px!important;background:#faf9f7!important}
-
+/* MultiSelect widget (inventory-specific) */
+div.stMultiSelect > div > div {
+    border: 1px solid var(--border) !important;
+    border-radius: 7px !important;
+    background: var(--surface-2) !important;
+}
 /* Pagination */
-.pag-info{font-size:12px;color:#aaa;text-align:center;padding:12px 0}
-
+.pag-info { font-size: 12px; color: var(--text-3); text-align: center; padding: 12px 0; }
 /* Empty state */
-.empty-state{text-align:center;padding:48px 24px;color:#bbb;font-size:14px}
-.empty-icon{font-size:36px;margin-bottom:12px}
+.empty-state { text-align: center; padding: 48px 24px; color: #BBB; font-size: 14px; }
+.empty-icon  { font-size: 36px; margin-bottom: 12px; }
+/* Pointer cursor on lead rows */
+.tbl tr:hover td { cursor: pointer; }
 </style>
 """
 
@@ -1849,6 +1763,8 @@ def _render_clutch_filter(org_id: int):
 
 def render(user):
     init_db()
+    from core.styles import inject_shared_css
+    inject_shared_css()
     st.markdown(CSS, unsafe_allow_html=True)
 
     # Archive lead flow (triggered from detail panel)

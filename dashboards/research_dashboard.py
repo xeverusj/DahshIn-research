@@ -22,151 +22,36 @@ from services.lead_service import (
 from services.flag_service import get_unresolved_flags, get_flag_summary
 
 
-# ── STYLES ────────────────────────────────────────────────────────────────────
+# ── STYLES (page-specific only — shared styles via core/styles.py) ────────────
 
-STYLES = """
+_UNIQUE_CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
-
-section[data-testid="stSidebar"] { background: #0F0F0F !important; }
-section[data-testid="stSidebar"] * { color: #E8E6E1 !important; }
-.stApp { background: #F7F6F3; font-family: 'IBM Plex Sans', sans-serif; }
-
-.rq-header {
-    background: #0F0F0F;
-    color: #F7F6F3;
-    padding: 24px 28px;
-    border-radius: 10px;
-    margin-bottom: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-.rq-header-title {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 18px;
-    font-weight: 600;
-    letter-spacing: -0.3px;
-}
-.rq-header-sub {
-    font-size: 12px;
-    color: #888;
-    margin-top: 4px;
-    font-family: 'IBM Plex Mono', monospace;
-}
-
-.task-card {
-    background: #FFFFFF;
-    border: 1px solid #E8E6E1;
-    border-radius: 8px;
-    padding: 16px 20px;
-    margin-bottom: 12px;
-    border-left: 4px solid #ccc;
-    transition: box-shadow 0.2s;
-}
-.task-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
-.task-card.urgent  { border-left-color: #E53935; }
-.task-card.normal  { border-left-color: #C9A96E; }
-.task-card.low     { border-left-color: #4CAF50; }
-
-.task-title {
-    font-weight: 600;
-    font-size: 15px;
-    color: #1A1917;
-    margin-bottom: 4px;
-}
-.task-meta {
-    font-size: 12px;
-    color: #888;
-    font-family: 'IBM Plex Mono', monospace;
-}
-.task-meta span { margin-right: 16px; }
-
-.priority-badge {
-    display: inline-block;
-    padding: 2px 10px;
-    border-radius: 12px;
-    font-size: 11px;
-    font-weight: 600;
-    font-family: 'IBM Plex Mono', monospace;
-    text-transform: uppercase;
-}
-.priority-urgent { background: #FFEBEE; color: #C62828; }
-.priority-normal { background: #FFF8E1; color: #8D6E0A; }
-.priority-low    { background: #E8F5E9; color: #2E7D32; }
-
-.status-badge {
-    display: inline-block;
-    padding: 2px 10px;
-    border-radius: 12px;
-    font-size: 11px;
-    font-weight: 500;
-    font-family: 'IBM Plex Mono', monospace;
-}
-.status-pending     { background: #F5F5F5; color: #666; }
-.status-in_progress { background: #E3F2FD; color: #1565C0; }
-.status-submitted   { background: #FFF3E0; color: #E65100; }
-.status-approved    { background: #E8F5E9; color: #2E7D32; }
-.status-rejected    { background: #FFEBEE; color: #C62828; }
-
-.kpi-row {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-    margin-bottom: 24px;
-}
-.kpi-card {
-    background: #FFFFFF;
-    border: 1px solid #E8E6E1;
-    border-radius: 8px;
-    padding: 16px;
-    text-align: center;
-}
+/* kpi-value: alias for .kpi-val used in research queue HTML */
 .kpi-value {
-    font-family: 'IBM Plex Mono', monospace;
+    font-family: 'Playfair Display', serif;
     font-size: 26px;
-    font-weight: 600;
-    color: #1A1917;
+    font-weight: 700;
+    color: var(--text-1);
 }
-.kpi-label {
-    font-size: 11px;
-    color: #999;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-top: 4px;
-}
-
+/* Flag chips */
 .flag-chip {
     display: inline-block;
-    background: #FFEBEE;
-    color: #C62828;
+    background: var(--error-bg);
+    color: var(--error);
+    border: 1px solid var(--error-border);
     padding: 2px 8px;
     border-radius: 10px;
     font-size: 11px;
     font-weight: 600;
     margin-right: 4px;
 }
-.flag-warning {
-    background: #FFF8E1;
-    color: #8D6E0A;
-}
-
-.progress-bar-wrap {
-    background: #F0EDE8;
-    border-radius: 4px;
-    height: 6px;
-    margin-top: 8px;
-    overflow: hidden;
-}
-.progress-bar-fill {
-    height: 100%;
-    border-radius: 4px;
-    background: #C9A96E;
-    transition: width 0.3s;
-}
-
-.deadline-overdue { color: #E53935 !important; font-weight: 600; }
-.deadline-soon    { color: #F57C00 !important; }
+.flag-warning { background: #FFF8E1; color: #8D6E0A; border-color: #F0D97A; }
+/* Progress bar */
+.progress-bar-wrap { background: var(--border-light); border-radius: 4px; height: 6px; margin-top: 8px; overflow: hidden; }
+.progress-bar-fill { height: 100%; border-radius: 4px; background: var(--accent); transition: width 0.3s; }
+/* Deadline colours */
+.deadline-overdue { color: var(--error) !important; font-weight: 600; }
+.deadline-soon    { color: #B45309 !important; }
 </style>
 """
 
@@ -184,7 +69,9 @@ REJECTION_REASONS = [
 
 
 def render(user: dict):
-    st.markdown(STYLES, unsafe_allow_html=True)
+    from core.styles import inject_shared_css
+    inject_shared_css()
+    st.markdown(_UNIQUE_CSS, unsafe_allow_html=True)
 
     org_id = user["org_id"]
     user_id = user["id"]

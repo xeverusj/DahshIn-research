@@ -336,6 +336,17 @@ def render_sidebar(user: dict) -> str:
 
         st.markdown('<hr class="sb-div">', unsafe_allow_html=True)
 
+        # Theme toggle — shared across all dashboards
+        if "dark_mode" not in st.session_state:
+            st.session_state["dark_mode"] = False
+        dark = st.session_state["dark_mode"]
+        toggle_label = "☀ Light" if dark else "🌙 Dark"
+        if st.button(toggle_label, key="global_theme_toggle", use_container_width=True):
+            st.session_state["dark_mode"] = not dark
+            st.rerun()
+
+        st.markdown('<hr class="sb-div">', unsafe_allow_html=True)
+
         if st.button("Sign Out", use_container_width=True):
             for k in ["user", "org_id", "page"]:
                 st.session_state.pop(k, None)
@@ -623,6 +634,11 @@ def main():
 
     # Render
     page = render_sidebar(user)
+
+    # Inject global theme CSS (overrides per-dashboard hardcoded light styles)
+    from core.theme import apply_theme
+    apply_theme()
+
     route(page, user)
 
 

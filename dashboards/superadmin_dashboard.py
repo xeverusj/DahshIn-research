@@ -193,33 +193,22 @@ def _r(row):
 
 
 def render(user: dict):
-    # ── Theme toggle ──────────────────────────────────────────────────
-    if "sa_dark_mode" not in st.session_state:
-        st.session_state["sa_dark_mode"] = True
-
-    dark = st.session_state["sa_dark_mode"]
+    # ── Theme — reads shared key set by app.py sidebar toggle ─────────
+    dark = st.session_state.get("dark_mode", False)
+    # Inject dashboard-specific component styles (org cards, tier chips, etc.)
     st.markdown(DARK_CSS if dark else LIGHT_CSS, unsafe_allow_html=True)
 
-    # Toggle button in top-right via columns
-    header_col, toggle_col = st.columns([8, 1])
-    with toggle_col:
-        label = "☀ Light" if dark else "🌙 Dark"
-        if st.button(label, key="theme_toggle", use_container_width=True):
-            st.session_state["sa_dark_mode"] = not dark
-            st.rerun()
-
-    with header_col:
-        st.markdown(f"""
-        <div class="sa-header">
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-                <div>
-                    <div class="sa-title">⚡ Dashin Platform</div>
-                    <div class="sa-sub">Super Admin · {date.today().strftime('%d %b %Y')}</div>
-                </div>
-                <span class="sa-badge">Super Admin</span>
+    st.markdown(f"""
+    <div class="sa-header">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+                <div class="sa-title">⚡ Dashin Platform</div>
+                <div class="sa-sub">Super Admin · {date.today().strftime('%d %b %Y')}</div>
             </div>
+            <span class="sa-badge">Super Admin</span>
         </div>
-        """, unsafe_allow_html=True)
+    </div>
+    """, unsafe_allow_html=True)
 
     tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
         "🏢 All Orgs",

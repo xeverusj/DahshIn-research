@@ -52,6 +52,14 @@ except ImportError:
     _STEALTH_AVAILABLE = False
     print("  [stealth] playwright-stealth not installed — run: pip install playwright-stealth")
 
+# ── Scrapling — enhanced HTML parsing with adaptive selectors ─────────────────
+try:
+    from scrapling.parser import Selector as _ScraplingSelector
+    _SCRAPLING_AVAILABLE = True
+    print("  [scrapling] Enhanced adaptive parsing active ✓")
+except ImportError:
+    _SCRAPLING_AVAILABLE = False
+
 # ── DB integration (optional) ─────────────────────────────────────────────────
 sys.path.insert(0, str(Path(__file__).parent))
 _db_available = False
@@ -124,7 +132,7 @@ SERVICE_SELECTORS = [
 
 
 def _try_selectors(card, selectors: list) -> str:
-    """Try multiple selectors, return first non-empty text found."""
+    """Try multiple selectors on a Playwright element, return first non-empty text found."""
     for sel in selectors:
         try:
             el = card.query_selector(sel)
@@ -137,52 +145,142 @@ def _try_selectors(card, selectors: list) -> str:
     return ""
 
 
-def extract_card(card) -> dict:
-    """Extract all fields from a single company card element."""
-    name     = _try_selectors(card, NAME_SELECTORS)
-    rating   = _try_selectors(card, RATING_SELECTORS)
-    reviews  = _try_selectors(card, REVIEWS_SELECTORS)
-    location = _try_selectors(card, LOCATION_SELECTORS)
-    budget   = _try_selectors(card, BUDGET_SELECTORS)
-    hourly   = _try_selectors(card, HOURLY_SELECTORS)
-    size     = _try_selectors(card, SIZE_SELECTORS)
-
-    # Services — collect all items
-    services = []
-    for sel in SERVICE_SELECTORS:
+def _try_selectors_scrapling(sc, selectors: list) -> str:
+    """
+    Try multiple CSS selectors on a Scrapling element.
+    Uses ::text pseudo-element for cleaner text extraction.
+    Falls back to raw element text if ::text returns nothing.
+    """
+    for sel in selectors:
         try:
-            items = card.query_selector_all(sel)
-            if items:
-                services = [i.inner_text().strip() for i in items[:3] if i.inner_text().strip()]
-                break
+            # Try with ::text first for clean text-only extraction
+            text = sc.css(f'{sel}::text').get()
+            if text and text.strip():
+                return text.strip()
+            # Fallback: get element and read its combined text
+            el = sc.css(sel).get()
+            if el and el.strip():
+                # Strip HTML tags from result
+                clean = re.sub(r'<[^>]+>', ' ', el).strip()
+                if clean:
+                    return clean
         except Exception:
             continue
+    return ""
 
-    # Profile URL
-    profile_url = ""
-    try:
-        link = card.query_selector("a[href*='/profile/'], a.company_info--name, h3 a, .provider-info--header a")
-        if link:
-            href = link.get_attribute("href") or ""
-            if href:
-                profile_url = urljoin("https://clutch.co", href) if href.startswith("/") else href
-    except Exception:
-        pass
 
-    # Website URL
-    website_url = ""
-    try:
-        site_link = card.query_selector("a[href*='website'], a.website-link, [class*='website'] a, a[rel*='nofollow'][target='_blank']:not([href*='clutch'])")
-        if site_link:
-            website_url = site_link.get_attribute("href") or ""
-    except Exception:
-        pass
+def extract_card(card) -> dict:
+    """
+    Extract all fields from a single company card element.
+    Uses Scrapling's selector engine when available for more robust
+    extraction (handles minified/obfuscated class names, ::text, adaptive
+    matching). Falls back to Playwright query_selector() when Scrapling is
+    not installed.
+    """
+    name = rating = reviews = location = budget = hourly = size = ""
+    services: list = []
+    profile_url = website_url = ""
 
-    # Clean up reviews text — extract just the number
+    # ── Scrapling path ────────────────────────────────────────────────────────
+    if _SCRAPLING_AVAILABLE:
+        try:
+            card_html = card.evaluate("el => el.outerHTML")
+            sc = _ScraplingSelector(card_html)
+
+            name     = _try_selectors_scrapling(sc, NAME_SELECTORS)
+            rating   = _try_selectors_scrapling(sc, RATING_SELECTORS)
+            reviews  = _try_selectors_scrapling(sc, REVIEWS_SELECTORS)
+            location = _try_selectors_scrapling(sc, LOCATION_SELECTORS)
+            budget   = _try_selectors_scrapling(sc, BUDGET_SELECTORS)
+            hourly   = _try_selectors_scrapling(sc, HOURLY_SELECTORS)
+            size     = _try_selectors_scrapling(sc, SIZE_SELECTORS)
+
+            # Services
+            for sel in SERVICE_SELECTORS:
+                try:
+                    items = sc.css(f'{sel}::text').getall()
+                    items = [i.strip() for i in items if i.strip()][:3]
+                    if items:
+                        services = items
+                        break
+                except Exception:
+                    continue
+
+            # Profile URL — use ::attr(href)
+            for sel in ["a[href*='/profile/']", "a.company_info--name", "h3 a",
+                        ".provider-info--header a"]:
+                try:
+                    href = sc.css(f'{sel}::attr(href)').get()
+                    if href:
+                        profile_url = (urljoin("https://clutch.co", href)
+                                       if href.startswith("/") else href)
+                        break
+                except Exception:
+                    continue
+
+            # Website URL
+            for sel in ["a[href*='website']", "a.website-link",
+                        "[class*='website'] a",
+                        "a[rel*='nofollow'][target='_blank']"]:
+                try:
+                    href = sc.css(f'{sel}::attr(href)').get()
+                    if href and 'clutch' not in href.lower():
+                        website_url = href
+                        break
+                except Exception:
+                    continue
+
+        except Exception as e:
+            # Scrapling failed — reset and fall through to Playwright path
+            name = rating = reviews = location = budget = hourly = size = ""
+            services = []
+            profile_url = website_url = ""
+
+    # ── Playwright path (fallback or when Scrapling not installed) ────────────
+    if not name:
+        name     = _try_selectors(card, NAME_SELECTORS)
+        rating   = _try_selectors(card, RATING_SELECTORS)
+        reviews  = _try_selectors(card, REVIEWS_SELECTORS)
+        location = _try_selectors(card, LOCATION_SELECTORS)
+        budget   = _try_selectors(card, BUDGET_SELECTORS)
+        hourly   = _try_selectors(card, HOURLY_SELECTORS)
+        size     = _try_selectors(card, SIZE_SELECTORS)
+
+        for sel in SERVICE_SELECTORS:
+            try:
+                items = card.query_selector_all(sel)
+                if items:
+                    services = [i.inner_text().strip() for i in items[:3]
+                                if i.inner_text().strip()]
+                    break
+            except Exception:
+                continue
+
+        try:
+            link = card.query_selector(
+                "a[href*='/profile/'], a.company_info--name, h3 a, .provider-info--header a"
+            )
+            if link:
+                href = link.get_attribute("href") or ""
+                if href:
+                    profile_url = (urljoin("https://clutch.co", href)
+                                   if href.startswith("/") else href)
+        except Exception:
+            pass
+
+        try:
+            site_link = card.query_selector(
+                "a[href*='website'], a.website-link, [class*='website'] a, "
+                "a[rel*='nofollow'][target='_blank']:not([href*='clutch'])"
+            )
+            if site_link:
+                website_url = site_link.get_attribute("href") or ""
+        except Exception:
+            pass
+
+    # Clean up fields
     reviews_clean = re.sub(r"[^\d]", "", reviews) if reviews else ""
-
-    # Clean rating
-    rating_clean = re.sub(r"[^\d.]", "", rating)[:4] if rating else ""
+    rating_clean  = re.sub(r"[^\d.]", "", rating)[:4] if rating else ""
 
     return {
         "company_name": name,
@@ -599,43 +697,77 @@ def _inject_start_button(page):
 
 def _extract_from_page_text(page, seen_names: set) -> list:
     """
-    Fallback: extract company names directly from page HTML
-    using Clutch's known JSON-LD structured data or meta tags.
+    Fallback: extract company names directly from page HTML using Clutch's
+    known JSON-LD structured data or meta tags.
+    Uses Scrapling's selector engine when available for more reliable
+    extraction of script[type="application/ld+json"] elements.
     """
     companies = []
+
+    def _parse_jsonld_items(raw_text: str) -> list:
+        """Parse a JSON-LD string and return a flat list of record items."""
+        try:
+            data = json.loads(raw_text)
+            if isinstance(data, list):
+                return data
+            if isinstance(data, dict):
+                return data.get("itemListElement", [data])
+        except Exception:
+            pass
+        return []
+
+    def _item_to_company(item: dict) -> dict | None:
+        name = (item.get("name") or
+                (item.get("item") or {}).get("name") or "")
+        if not name or name.lower() in seen_names or len(name) <= 2:
+            return None
+        rating = str(
+            item.get("ratingValue") or
+            (item.get("aggregateRating") or {}).get("ratingValue") or ""
+        )
+        return {
+            "company_name": name.strip(),
+            "rating":       rating,
+            "reviews":      "",
+            "location":     "",
+            "min_budget":   "",
+            "hourly_rate":  "",
+            "team_size":    "",
+            "top_services": "",
+            "clutch_url":   item.get("url") or "",
+            "website":      "",
+        }
+
+    # ── Scrapling path ────────────────────────────────────────────────────────
+    if _SCRAPLING_AVAILABLE:
+        try:
+            html = page.content()
+            root = _ScraplingSelector(html)
+            # ::text on script elements returns the raw script body
+            for raw in root.css('script[type="application/ld+json"]::text').getall():
+                for item in _parse_jsonld_items(raw):
+                    co = _item_to_company(item)
+                    if co:
+                        companies.append(co)
+            if companies:
+                return companies
+        except Exception:
+            pass  # fall through to Playwright path
+
+    # ── Playwright path ───────────────────────────────────────────────────────
     try:
-        # Try JSON-LD structured data
         scripts = page.query_selector_all('script[type="application/ld+json"]')
         for script in scripts:
             try:
-                data = json.loads(script.inner_text())
-                if isinstance(data, list):
-                    items = data
-                elif isinstance(data, dict):
-                    items = data.get("itemListElement", [data])
-                else:
-                    continue
-                for item in items:
-                    name = (item.get("name") or
-                            (item.get("item") or {}).get("name") or "")
-                    if name and name.lower() not in seen_names and len(name) > 2:
-                        companies.append({
-                            "company_name": name.strip(),
-                            "rating": str(item.get("ratingValue") or
-                                         (item.get("aggregateRating") or {}).get("ratingValue") or ""),
-                            "reviews": "",
-                            "location": "",
-                            "min_budget": "",
-                            "hourly_rate": "",
-                            "team_size": "",
-                            "top_services": "",
-                            "clutch_url": item.get("url") or "",
-                            "website": "",
-                        })
+                for item in _parse_jsonld_items(script.inner_text()):
+                    co = _item_to_company(item)
+                    if co:
+                        companies.append(co)
             except Exception:
                 continue
     except Exception:
         pass
+
     return companies
 
 

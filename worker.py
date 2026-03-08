@@ -53,18 +53,18 @@ except ImportError:
     _STEALTH_AVAILABLE = False
     print("  [stealth] playwright-stealth not installed — run: pip install playwright-stealth")
 
-# ── Scrapling — enhanced HTML parsing with adaptive selectors ─────────────────
-# Scrapling provides a Parsel-compatible selector engine with ::text / ::attr()
-# pseudo-elements and find_similar() adaptive matching. When installed, it
-# replaces the raw Playwright DOM traversal in fallback parsing functions,
-# giving much more robust extraction when class names drift between scrapes.
+# ── Inhouse HTML selector — lxml + cssselect ──────────────────────────────────
+# Uses the same underlying libraries as Scrapling (lxml + cssselect) but
+# without any external scraping framework dependency. Provides a Parsel-
+# compatible API: Selector(html), .css('sel::text'), .css('a::attr(href)'),
+# .find_all('div'), .get() / .getall().
 try:
-    from scrapling.parser import Selector as _ScraplingSelector
-    _SCRAPLING_AVAILABLE = True
-    print("  [scrapling] Enhanced adaptive parsing active ✓")
+    from core.html_selector import Selector as _HTMLSelector
+    _HTML_SELECTOR_AVAILABLE = True
+    print("  [html_selector] Inhouse adaptive parsing active ✓")
 except ImportError:
-    _SCRAPLING_AVAILABLE = False
-    print("  [scrapling] Not installed — run: pip install 'scrapling[fetchers]'")
+    _HTML_SELECTOR_AVAILABLE = False
+    print("  [html_selector] lxml/cssselect not installed — run: pip install lxml cssselect")
 
 # Windows fix — use default event loop (ProactorEventLoopPolicy deprecated in 3.12+)
 if sys.platform.startswith("win"):
@@ -610,23 +610,23 @@ Return ONLY valid JSON (no markdown, no explanation, no ```):
             # Keep Claude's original confidence; don't force retry
             print(f"  ~ Selector {card_sel!r} unconfirmed in DOM (virtual scroll?) — trusting Claude")
 
-        # ── Scrapling cross-check on rendered HTML ─────────────────────────
+        # ── Inhouse selector cross-check on rendered HTML ─────────────────
         # Parses the RENDERED HTML string (not the live DOM), which catches
         # cards that are in the HTML but not yet in the Playwright DOM object.
-        if _SCRAPLING_AVAILABLE and card_sel:
+        if _HTML_SELECTOR_AVAILABLE and card_sel:
             try:
                 html = page.content()
-                scrapling_root = _ScraplingSelector(html)
-                scrapling_count = len(scrapling_root.css(card_sel))
-                if scrapling_count > 0:
-                    print(f"  ✓ Scrapling confirms: {scrapling_count} cards in rendered HTML")
+                html_root = _HTMLSelector(html)
+                html_count = len(html_root.css(card_sel))
+                if html_count > 0:
+                    print(f"  ✓ html_selector confirms: {html_count} cards in rendered HTML")
                     if live_count == 0:
                         # DOM said 0 but HTML has cards — mild confidence boost
                         result["confidence"] = min(0.95, result["confidence"] + 0.05)
                 else:
-                    print(f"  ~ Scrapling: 0 matches in rendered HTML (JS-rendered?)")
+                    print(f"  ~ html_selector: 0 matches in rendered HTML (JS-rendered?)")
             except Exception as _se:
-                pass  # Scrapling check is optional — never block on it
+                pass  # HTML selector check is optional — never block on it
 
         desc = result.get("description", "")
         print(f"  Page: {desc}")
@@ -1171,11 +1171,11 @@ def parse_card_with_structure(card, structure):
         title_sel = structure.get("title_selector")
         company_sel = structure.get("company_selector")
 
-        # ── Scrapling path: parse card outer HTML for reliable extraction ──
-        if _SCRAPLING_AVAILABLE and (name_sel or title_sel or company_sel):
+        # ── Inhouse selector path: parse card outer HTML for reliable extraction ──
+        if _HTML_SELECTOR_AVAILABLE and (name_sel or title_sel or company_sel):
             try:
                 card_html = card.evaluate("el => el.outerHTML")
-                sc = _ScraplingSelector(card_html)
+                sc = _HTMLSelector(card_html)
 
                 if name_sel:
                     v = sc.css(f'{name_sel}::text').get() or sc.css(name_sel).get()
@@ -1194,7 +1194,7 @@ def parse_card_with_structure(card, structure):
             except Exception:
                 pass  # fall through to Playwright path
 
-        # ── Playwright path (when Scrapling not installed or sub-selectors absent) ──
+        # ── Playwright path (when inhouse selector not installed or sub-selectors absent) ──
         if not name:
             if name_sel:
                 try:
@@ -1243,18 +1243,18 @@ def parse_card_with_structure(card, structure):
 
 def parse_generic_divs(page):
     """
-    Fallback parser. When Scrapling is available, uses its adaptive Parsel-
-    compatible selector engine on the full page HTML — handles obfuscated /
-    minified class names and dynamically-generated markup better than raw DOM
-    traversal. Falls back to the original Playwright path when not installed.
+    Fallback parser. When the inhouse html_selector is available, uses lxml +
+    cssselect on the full page HTML — handles obfuscated / minified class names
+    and dynamically-generated markup better than raw DOM traversal. Falls back
+    to the original Playwright path when lxml/cssselect is not installed.
     """
     results = {}
 
-    # ── Scrapling path (preferred) ────────────────────────────────────────────
-    if _SCRAPLING_AVAILABLE:
+    # ── Inhouse html_selector path (preferred) ────────────────────────────────
+    if _HTML_SELECTOR_AVAILABLE:
         try:
             html = page.content()
-            root = _ScraplingSelector(html)
+            root = _HTMLSelector(html)
             # find_all('div') walks the full tree; each element exposes .html
             # and .css('*::text') to get all descendant text nodes.
             for block in root.find_all('div'):
@@ -1284,7 +1284,7 @@ def parse_generic_divs(page):
                     continue
             return results
         except Exception as e:
-            print(f"  [scrapling] parse_generic_divs error: {e} — using DOM fallback")
+            print(f"  [html_selector] parse_generic_divs error: {e} — using DOM fallback")
 
     # ── Original Playwright DOM path ──────────────────────────────────────────
     try:

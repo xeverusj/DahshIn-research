@@ -52,13 +52,13 @@ except ImportError:
     _STEALTH_AVAILABLE = False
     print("  [stealth] playwright-stealth not installed — run: pip install playwright-stealth")
 
-# ── Scrapling — enhanced HTML parsing with adaptive selectors ─────────────────
+# ── Inhouse HTML selector — lxml + cssselect ──────────────────────────────────
 try:
-    from scrapling.parser import Selector as _ScraplingSelector
-    _SCRAPLING_AVAILABLE = True
-    print("  [scrapling] Enhanced adaptive parsing active ✓")
+    from core.html_selector import Selector as _HTMLSelector
+    _HTML_SELECTOR_AVAILABLE = True
+    print("  [html_selector] Inhouse adaptive parsing active ✓")
 except ImportError:
-    _SCRAPLING_AVAILABLE = False
+    _HTML_SELECTOR_AVAILABLE = False
 
 # ── DB integration (optional) ─────────────────────────────────────────────────
 sys.path.insert(0, str(Path(__file__).parent))
@@ -145,9 +145,9 @@ def _try_selectors(card, selectors: list) -> str:
     return ""
 
 
-def _try_selectors_scrapling(sc, selectors: list) -> str:
+def _try_selectors_html(sc, selectors: list) -> str:
     """
-    Try multiple CSS selectors on a Scrapling element.
+    Try multiple CSS selectors on an inhouse Selector element.
     Uses ::text pseudo-element for cleaner text extraction.
     Falls back to raw element text if ::text returns nothing.
     """
@@ -172,28 +172,27 @@ def _try_selectors_scrapling(sc, selectors: list) -> str:
 def extract_card(card) -> dict:
     """
     Extract all fields from a single company card element.
-    Uses Scrapling's selector engine when available for more robust
-    extraction (handles minified/obfuscated class names, ::text, adaptive
-    matching). Falls back to Playwright query_selector() when Scrapling is
-    not installed.
+    Uses the inhouse html_selector engine when available for more robust
+    extraction (handles minified/obfuscated class names, ::text, ::attr()).
+    Falls back to Playwright query_selector() when lxml/cssselect is not installed.
     """
     name = rating = reviews = location = budget = hourly = size = ""
     services: list = []
     profile_url = website_url = ""
 
-    # ── Scrapling path ────────────────────────────────────────────────────────
-    if _SCRAPLING_AVAILABLE:
+    # ── Inhouse html_selector path ────────────────────────────────────────────
+    if _HTML_SELECTOR_AVAILABLE:
         try:
             card_html = card.evaluate("el => el.outerHTML")
-            sc = _ScraplingSelector(card_html)
+            sc = _HTMLSelector(card_html)
 
-            name     = _try_selectors_scrapling(sc, NAME_SELECTORS)
-            rating   = _try_selectors_scrapling(sc, RATING_SELECTORS)
-            reviews  = _try_selectors_scrapling(sc, REVIEWS_SELECTORS)
-            location = _try_selectors_scrapling(sc, LOCATION_SELECTORS)
-            budget   = _try_selectors_scrapling(sc, BUDGET_SELECTORS)
-            hourly   = _try_selectors_scrapling(sc, HOURLY_SELECTORS)
-            size     = _try_selectors_scrapling(sc, SIZE_SELECTORS)
+            name     = _try_selectors_html(sc, NAME_SELECTORS)
+            rating   = _try_selectors_html(sc, RATING_SELECTORS)
+            reviews  = _try_selectors_html(sc, REVIEWS_SELECTORS)
+            location = _try_selectors_html(sc, LOCATION_SELECTORS)
+            budget   = _try_selectors_html(sc, BUDGET_SELECTORS)
+            hourly   = _try_selectors_html(sc, HOURLY_SELECTORS)
+            size     = _try_selectors_html(sc, SIZE_SELECTORS)
 
             # Services
             for sel in SERVICE_SELECTORS:
@@ -231,12 +230,12 @@ def extract_card(card) -> dict:
                     continue
 
         except Exception as e:
-            # Scrapling failed — reset and fall through to Playwright path
+            # html_selector failed — reset and fall through to Playwright path
             name = rating = reviews = location = budget = hourly = size = ""
             services = []
             profile_url = website_url = ""
 
-    # ── Playwright path (fallback or when Scrapling not installed) ────────────
+    # ── Playwright path (fallback or when lxml/cssselect not installed) ───────
     if not name:
         name     = _try_selectors(card, NAME_SELECTORS)
         rating   = _try_selectors(card, RATING_SELECTORS)
@@ -738,11 +737,11 @@ def _extract_from_page_text(page, seen_names: set) -> list:
             "website":      "",
         }
 
-    # ── Scrapling path ────────────────────────────────────────────────────────
-    if _SCRAPLING_AVAILABLE:
+    # ── Inhouse html_selector path ────────────────────────────────────────────
+    if _HTML_SELECTOR_AVAILABLE:
         try:
             html = page.content()
-            root = _ScraplingSelector(html)
+            root = _HTMLSelector(html)
             # ::text on script elements returns the raw script body
             for raw in root.css('script[type="application/ld+json"]::text').getall():
                 for item in _parse_jsonld_items(raw):

@@ -1159,8 +1159,8 @@ def scrape_brella(page, contacts_dict, session_filepath, category):
 def parse_card_with_structure(card, structure):
     """
     Parse a single card element using the AI-identified sub-selectors.
-    When Scrapling is available, parses the card's outer HTML for more
-    robust extraction — especially when obfuscated/dynamic class names
+    Uses the inhouse html_selector (lxml+cssselect) to parse the card's outer
+    HTML for robust extraction — especially when obfuscated/dynamic class names
     make Playwright query_selector() unreliable. Falls back to inner text
     parsing if sub-selectors aren't set.
     """

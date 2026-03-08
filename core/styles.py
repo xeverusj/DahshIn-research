@@ -82,7 +82,7 @@ html, body, [class*="css"] {
 
 /* Header title text — unified Playfair serif */
 .rq-header-title, .rm-title, .cb-title,
-.cm-title, .admin-title, .est-title {
+.cm-title, .admin-title, .est-title, .sa-title {
     font-family: 'Playfair Display', serif !important;
     font-size: 22px !important;
     font-weight: 700 !important;
@@ -92,7 +92,7 @@ html, body, [class*="css"] {
 
 /* Header subtitle text */
 .rq-header-sub, .rm-sub, .cb-sub,
-.cm-sub, .admin-sub, .est-sub {
+.cm-sub, .admin-sub, .est-sub, .sa-sub {
     font-family: 'Inter', sans-serif !important;
     font-size: 12px !important;
     color: #888 !important;

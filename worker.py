@@ -254,12 +254,16 @@ def load_patterns():
                     except Exception as e:
                         logging.warning(f"[worker.load_patterns] Failed to parse selectors JSON for {domain}: {e}")
                     cleaned[domain] = {
-                        "card_selector":       selectors.get("card", ""),
-                        "pagination_type":     row.get("pagination_type", "none"),
+                        "card_selector":        selectors.get("card", ""),
+                        "name_selector":        selectors.get("name_selector", ""),
+                        "title_selector":       selectors.get("title_selector", ""),
+                        "company_selector":     selectors.get("company_selector", ""),
+                        "pagination_type":      row.get("pagination_type", "none"),
                         "next_button_selector": selectors.get("next_button", ""),
-                        "layout_type":         row.get("layout_type", "generic"),
-                        "confidence":          row.get("confidence", 1.0),
-                        "saved_at":            lu_ts,
+                        "layout_type":          row.get("layout_type", "generic"),
+                        "confidence":           row.get("confidence", 1.0),
+                        "saved_at":             lu_ts,
+                        "fingerprint":          selectors.get("fingerprint"),
                     }
                 if cleaned:
                     return cleaned
@@ -294,8 +298,12 @@ def save_pattern(domain, data):
         try:
             conn = _db_conn()
             selectors = json.dumps({
-                "card":        data.get("card_selector", ""),
-                "next_button": data.get("next_button_selector", ""),
+                "card":             data.get("card_selector", ""),
+                "next_button":      data.get("next_button_selector", ""),
+                "name_selector":    data.get("name_selector", ""),
+                "title_selector":   data.get("title_selector", ""),
+                "company_selector": data.get("company_selector", ""),
+                "fingerprint":      data.get("fingerprint"),
             })
             conn.execute("""
                 INSERT INTO layout_patterns
@@ -556,7 +564,17 @@ Return ONLY valid JSON (no markdown, no explanation, no ```):
   "pagination_type": "url_param | next_button | infinite_scroll | load_more",
   "next_button_selector": "CSS selector for the Next button if pagination_type=next_button, else null",
   "confidence": 0.0,
-  "reasoning": "2-3 sentence explanation of why you chose this card_selector"
+  "reasoning": "2-3 sentence explanation of why you chose this card_selector",
+  "fingerprint": {{
+    "tag": "primary HTML tag of each card element (div/li/article/tr)",
+    "class_keywords": ["up to 6 most meaningful fragments of class names on the card element — ignore random hashes"],
+    "attr_names": ["data-* or other non-class/style/id attribute names present on card elements"],
+    "avg_child_count": 0,
+    "parent_tag": "HTML tag of the immediate parent container holding all cards",
+    "parent_class_keywords": ["up to 3 class fragments of the parent container"],
+    "has_img": false,
+    "text_pattern": "short description of what text lines appear inside one card e.g. Name + Title + Company"
+  }}
 }}"""
 
     try:
@@ -680,6 +698,20 @@ def ai_identify_page_structure(page, api_key, domain):
 
     if best_result and best_confidence >= 0.65:
         print(f"  Best result: confidence={best_confidence:.2f}, selector={best_result.get('card_selector')!r}")
+        # Build live DOM fingerprint — more accurate than Claude's visual guess.
+        # This is what the healing system uses on future visits to re-find the
+        # element even after class names or selectors change.
+        live_fp = build_fingerprint_from_page(page, best_result.get("card_selector", ""))
+        if live_fp:
+            # Merge: live DOM data overrides Claude's estimates; Claude's text_pattern
+            # and attr hints are kept if the live scan didn't capture them.
+            merged = dict(best_result.get("fingerprint") or {})
+            merged.update(live_fp)
+            best_result["fingerprint"] = merged
+            print(f"  [fingerprint] Stored for domain '{domain}' — "
+                  f"tag={merged.get('tag')}, "
+                  f"classes={merged.get('class_keywords')[:3]}, "
+                  f"attrs={merged.get('attr_names')[:3]}")
         save_pattern(domain, best_result)
         return best_result
     elif best_result and best_confidence >= 0.4:
@@ -690,6 +722,227 @@ def ai_identify_page_structure(page, api_key, domain):
         print(f"  All {AI_MAX_RETRIES} attempts failed or too low confidence ({best_confidence:.2f})")
         print("  Falling back to generic div scraper...")
         return None
+
+
+# ==========================================
+# ADAPTIVE ELEMENT FINGERPRINTING
+# ==========================================
+
+def build_fingerprint_from_page(page, card_selector):
+    """
+    Build a rich structural fingerprint from live DOM cards.
+    Called after Claude identifies a selector — captures what the element
+    actually looks like so future visits can re-find it even if classes change.
+    """
+    try:
+        fp = page.evaluate("""(sel) => {
+            const cards = Array.from(document.querySelectorAll(sel)).slice(0, 10);
+            if (!cards.length) return null;
+
+            const tags = {}, classWords = {}, attrNames = {},
+                  parentTags = {}, parentClassWords = {};
+            let totalText = 0, totalChildren = 0, hasImg = 0, totalDepth = 0;
+            const sampleTexts = [];
+
+            cards.forEach(card => {
+                const tag = card.tagName.toLowerCase();
+                tags[tag] = (tags[tag] || 0) + 1;
+
+                (card.className || '').split(/\\s+/).filter(c => c.length > 2 && !/^[a-z0-9]{6,}$/.test(c)).forEach(c => {
+                    classWords[c] = (classWords[c] || 0) + 1;
+                });
+
+                Array.from(card.attributes).forEach(a => {
+                    if (!['class','style','id'].includes(a.name))
+                        attrNames[a.name] = (attrNames[a.name] || 0) + 1;
+                });
+
+                if (card.parentElement) {
+                    const pt = card.parentElement.tagName.toLowerCase();
+                    parentTags[pt] = (parentTags[pt] || 0) + 1;
+                    (card.parentElement.className || '').split(/\\s+/).filter(c => c.length > 2 && !/^[a-z0-9]{6,}$/.test(c)).forEach(c => {
+                        parentClassWords[c] = (parentClassWords[c] || 0) + 1;
+                    });
+                }
+
+                const txt = (card.innerText || '').trim();
+                totalText += txt.length;
+                totalChildren += card.children.length;
+                if (card.querySelector('img')) hasImg++;
+                if (sampleTexts.length < 3 && txt.length > 5)
+                    sampleTexts.push(txt.substring(0, 100));
+
+                let depth = 0, el = card;
+                while (el && el !== document.body) { depth++; el = el.parentElement; }
+                totalDepth += depth;
+            });
+
+            const n = cards.length;
+            const topN = (obj, k) =>
+                Object.entries(obj).sort((a, b) => b[1] - a[1]).slice(0, k).map(e => e[0]);
+
+            return {
+                tag:                   topN(tags, 1)[0] || 'div',
+                class_keywords:        topN(classWords, 6),
+                attr_names:            topN(attrNames, 5),
+                avg_text_length:       Math.round(totalText / n),
+                avg_child_count:       Math.round(totalChildren / n),
+                parent_tag:            topN(parentTags, 1)[0] || '',
+                parent_class_keywords: topN(parentClassWords, 3),
+                has_img_ratio:         hasImg / n,
+                avg_dom_depth:         Math.round(totalDepth / n),
+                sample_texts:          sampleTexts,
+                card_count_seen:       n,
+            };
+        }""", card_selector)
+        if fp:
+            print(f"  [fingerprint] Built from live DOM — tag={fp.get('tag')}, "
+                  f"classes={fp.get('class_keywords')}, attrs={fp.get('attr_names')}")
+        return fp
+    except Exception as e:
+        print(f"  [fingerprint] Build failed: {e}")
+        return None
+
+
+def fingerprint_score(page, fingerprint):
+    """
+    Score all candidate elements against a stored fingerprint using JS.
+    Returns (best_css_selector, score) or (None, 0.0) if no confident match.
+
+    This is the core of the adaptive healing system — it finds elements
+    by what they LOOK LIKE, not by a brittle class name or selector string.
+    """
+    if not fingerprint:
+        return None, 0.0
+    try:
+        result = page.evaluate("""(fp) => {
+            const candidates = Array.from(
+                document.querySelectorAll('div, li, article, section, tr, [class]')
+            );
+
+            function score(el) {
+                let s = 0.0;
+
+                // Tag match
+                if (el.tagName.toLowerCase() === fp.tag) s += 0.15;
+
+                // Class keyword overlap (skip obfuscated hashes)
+                const classes = (el.className || '').toLowerCase();
+                const clsMatches = fp.class_keywords.filter(
+                    k => k && classes.includes(k.toLowerCase())
+                ).length;
+                s += (clsMatches / Math.max(fp.class_keywords.length, 1)) * 0.25;
+
+                // Attribute name overlap
+                const attrNames = Array.from(el.attributes).map(a => a.name);
+                const attrMatches = fp.attr_names.filter(a => attrNames.includes(a)).length;
+                s += (attrMatches / Math.max(fp.attr_names.length, 1)) * 0.15;
+
+                // Child count proximity
+                const childDiff = Math.abs(el.children.length - fp.avg_child_count);
+                s += Math.max(0, 0.15 - childDiff * 0.03);
+
+                // Text length proximity
+                const txtLen = (el.innerText || '').trim().length;
+                if (fp.avg_text_length > 0) {
+                    const ratio = txtLen / fp.avg_text_length;
+                    if (ratio > 0.4 && ratio < 2.5) s += 0.15;
+                }
+
+                // Image presence match
+                const hasImg = !!el.querySelector('img');
+                if ((fp.has_img_ratio > 0.5) === hasImg) s += 0.08;
+
+                // Parent tag match
+                if (el.parentElement &&
+                    el.parentElement.tagName.toLowerCase() === fp.parent_tag) s += 0.07;
+
+                return s;
+            }
+
+            const scored = candidates
+                .map(el => ({ el, s: score(el) }))
+                .filter(x => x.s > 0.35)
+                .sort((a, b) => b.s - a.s);
+
+            if (!scored.length) return null;
+
+            const best = scored[0];
+            const el = best.el;
+            const tag = el.tagName.toLowerCase();
+            let sel = null;
+
+            // Prefer data-* attribute selector (most stable across deploys)
+            for (const a of Array.from(el.attributes)) {
+                if (a.name.startsWith('data-')) {
+                    const pattern = tag + '[' + a.name + ']';
+                    if (document.querySelectorAll(pattern).length >= 3) {
+                        sel = pattern; break;
+                    }
+                }
+            }
+
+            // Class-based selector (filter out short/hash classes)
+            if (!sel) {
+                for (const cls of Array.from(el.classList)) {
+                    if (cls.length < 3 || /^[a-z0-9]{6,}$/.test(cls)) continue;
+                    const pattern = tag + '.' + cls;
+                    if (document.querySelectorAll(pattern).length >= 3) {
+                        sel = pattern; break;
+                    }
+                }
+            }
+
+            // Structural fallback: parent > tag
+            if (!sel && el.parentElement) {
+                const ptag = el.parentElement.tagName.toLowerCase();
+                const pattern = ptag + ' > ' + tag;
+                if (document.querySelectorAll(pattern).length >= 3) sel = pattern;
+            }
+
+            if (!sel) return null;
+            return { selector: sel, score: best.s };
+        }""", fingerprint)
+
+        if result and result.get("score", 0) >= 0.45:
+            return result["selector"], result["score"]
+    except Exception as e:
+        print(f"  [fingerprint] Scoring error: {e}")
+    return None, 0.0
+
+
+def heal_selector(page, structure):
+    """
+    Attempt to recover a broken selector using fingerprint similarity.
+    Returns updated structure dict with healed card_selector, or None if failed.
+
+    Called when a cached selector returns 0 cards — before falling back to Claude.
+    """
+    fingerprint = structure.get("fingerprint")
+    if not fingerprint:
+        print("  [heal] No fingerprint stored — skipping to Claude")
+        return None
+
+    print("  [heal] Fingerprint similarity scan running...")
+    new_selector, score = fingerprint_score(page, fingerprint)
+
+    if new_selector:
+        count = verify_selector_on_page(page, new_selector)
+        if count > 0:
+            print(f"  [heal] ✓ Recovered selector: {new_selector!r}  "
+                  f"score={score:.2f}  cards={count}")
+            healed = dict(structure)
+            healed["card_selector"] = new_selector
+            # Rebuild fingerprint from live DOM now that we found the element
+            live_fp = build_fingerprint_from_page(page, new_selector)
+            if live_fp:
+                healed["fingerprint"] = live_fp
+            return healed
+        else:
+            print(f"  [heal] Candidate {new_selector!r} found but 0 cards in live DOM")
+
+    print("  [heal] Could not recover — falling back to Claude Vision")
+    return None
 
 
 # ==========================================
@@ -1815,8 +2068,20 @@ def run_worker(target_url, mobile=False):
 
         if structure:
             print(f"Remembered structure for {domain}: card={structure.get('card_selector')!r}")
+            # Quick pre-check: verify cached selector works before entering the loop.
+            # If it returns 0 cards, try fingerprint healing now so the loop starts healthy.
+            cached_sel = structure.get("card_selector")
+            if cached_sel and verify_selector_on_page(page, cached_sel) == 0:
+                print(f"  Cached selector returns 0 — trying fingerprint healing before loop...")
+                healed = heal_selector(page, structure)
+                if healed:
+                    structure = healed
+                    print(f"  Pre-healed to: {structure['card_selector']!r}")
+                    save_pattern(domain, structure)
+                else:
+                    print(f"  Pre-heal failed — Claude Vision will run if needed inside loop")
         else:
-            print(f"New site — asking Claude to analyse the page...")
+            print(f"New site — asking Claude to analyse the page structure...")
             structure = ai_identify_page_structure(page, api_key, domain)
 
         # Decide pagination mode
@@ -1916,15 +2181,28 @@ def run_worker(target_url, mobile=False):
                     print(f"Cards found: {len(cards)}")
 
                     if len(cards) == 0 and page_num == 1:
-                        # Selector worked before but finds nothing now — re-ask Claude
-                        print("  Selector finds 0 cards — re-asking Claude...")
-                        structure = ai_identify_page_structure(page, api_key, domain)
-                        if structure:
-                            card_selector = structure.get("card_selector")
+                        # Step 2: fingerprint similarity — heal without calling Claude
+                        print("  Selector finds 0 cards — trying fingerprint healing...")
+                        healed = heal_selector(page, structure or {})
+                        if healed:
+                            structure = healed
+                            card_selector = structure["card_selector"]
                             next_btn_selector = structure.get("next_button_selector")
                             pagination_type = structure.get("pagination_type", pagination_type)
-                            cards = page.query_selector_all(card_selector) if card_selector else []
-                            print(f"  Retried — cards found: {len(cards)}")
+                            cards = page.query_selector_all(card_selector)
+                            print(f"  Healed — cards found: {len(cards)}")
+                            save_pattern(domain, structure)  # persist healed selector + updated fingerprint
+
+                        if not healed or len(cards) == 0:
+                            # Step 3: Claude Vision deep inspection (last resort before generic fallback)
+                            print("  Healing failed — invoking Claude Vision deep inspection...")
+                            structure = ai_identify_page_structure(page, api_key, domain)
+                            if structure:
+                                card_selector = structure.get("card_selector")
+                                next_btn_selector = structure.get("next_button_selector")
+                                pagination_type = structure.get("pagination_type", pagination_type)
+                                cards = page.query_selector_all(card_selector) if card_selector else []
+                                print(f"  Claude Vision result — cards found: {len(cards)}")
 
                     for card in cards:
                         result = parse_card_with_structure(card, structure or {})

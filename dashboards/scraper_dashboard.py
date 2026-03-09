@@ -71,6 +71,42 @@ def _get_recent_sessions(org_id: int, limit: int = 15) -> list:
         conn.close()
 
 
+def _clear_stale_sessions(org_id: int, max_age_hours: int = 4):
+    """Mark any 'running' sessions older than max_age_hours as failed."""
+    conn = get_connection()
+    try:
+        cutoff = (datetime.datetime.utcnow() -
+                  datetime.timedelta(hours=max_age_hours)).isoformat()
+        conn.execute("""
+            UPDATE scrape_sessions
+            SET status='failed', finished_at=?
+            WHERE (org_id=? OR org_id IS NULL)
+              AND status='running'
+              AND started_at < ?
+        """, (datetime.datetime.utcnow().isoformat(), org_id, cutoff))
+        conn.commit()
+    except Exception as e:
+        logging.warning(f"[scraper_dashboard._clear_stale_sessions] {e}")
+    finally:
+        conn.close()
+
+
+def _force_clear_running(org_id: int):
+    """Admin action: mark ALL running sessions for this org as failed."""
+    conn = get_connection()
+    try:
+        conn.execute("""
+            UPDATE scrape_sessions
+            SET status='failed', finished_at=?
+            WHERE (org_id=? OR org_id IS NULL) AND status='running'
+        """, (datetime.datetime.utcnow().isoformat(), org_id))
+        conn.commit()
+    except Exception as e:
+        logging.warning(f"[scraper_dashboard._force_clear_running] {e}")
+    finally:
+        conn.close()
+
+
 def _get_running_session(org_id: int) -> dict | None:
     """Return the currently running scrape session for this org, if any."""
     conn = get_connection()
@@ -263,6 +299,9 @@ def render(user: dict = None):
     org_id = (user or {}).get("org_id", 1)
     role   = (user or {}).get("role", "researcher")
     is_admin = role in ("super_admin", "org_admin")
+
+    # Auto-expire stale locks (sessions stuck 'running' for > 4 hours)
+    _clear_stale_sessions(org_id)
 
     from core.styles import inject_shared_css
     inject_shared_css()
@@ -473,7 +512,7 @@ def render(user: dict = None):
                 go = st.button("🚀 Launch", type="primary", use_container_width=True)
             with c2:
                 st.markdown(
-                    '<p style="font-size:12px;color:#bbb;padding-top:12px">'
+                    '<p style="font-size:12px;color:var(--text-3);padding-top:12px">'
                     "Runs in background — you can navigate away while it scrapes.</p>",
                     unsafe_allow_html=True,
                 )
@@ -497,11 +536,16 @@ def render(user: dict = None):
             # Scrape lock — only one active scrape per org
             running = _get_running_session(org_id)
             if running:
+                started = (running.get('started_at') or '')[:16]
                 st.warning(
-                    f"⚠️ A scrape is already running for your org "
-                    f"(started {(running.get('started_at') or '')[:16]}). "
-                    f"Wait for it to finish or check the database."
+                    f"⚠️ A scrape session is still marked as running "
+                    f"(started {started}). If no scrape is actually running, "
+                    f"use the button below to clear the lock."
                 )
+                if st.button("🔓 Force clear lock", type="secondary"):
+                    _force_clear_running(org_id)
+                    st.success("Lock cleared — you can now launch a new scrape.")
+                    st.rerun()
             else:
                 script_path = _PROJECT_ROOT / scraper["script"]
                 if not script_path.exists():
@@ -554,7 +598,7 @@ def render(user: dict = None):
 
     sessions = _get_recent_sessions(org_id, 15)
     if not sessions:
-        st.markdown('<p style="color:#aaa;font-size:13px;padding:16px 0">No sessions yet.</p>',
+        st.markdown('<p style="color:var(--text-3);font-size:13px;padding:16px 0">No sessions yet.</p>',
                     unsafe_allow_html=True)
     else:
         rows_html = ""
@@ -567,12 +611,12 @@ def render(user: dict = None):
             rows_html += f"""<tr>
               <td class="n">{evt}</td><td>{cat}</td>
               <td>{sess.get('leads_found', 0)}</td>
-              <td style="color:#3d9e6a;font-weight:600">{sess.get('leads_new', 0)}</td>
-              <td style="color:#aaa">{sess.get('leads_dupes', 0)}</td>
+              <td style="color:var(--success);font-weight:600">{sess.get('leads_new', 0)}</td>
+              <td style="color:var(--text-3)">{sess.get('leads_dupes', 0)}</td>
               <td>{badge(sess.get('status', 'running'))}</td>
-              <td style="color:#bbb;font-size:11px">{pat}</td>
-              <td style="color:#bbb;font-size:11px">${ai:.4f}</td>
-              <td style="color:#bbb;font-size:11px">{dt}</td>
+              <td style="color:var(--text-3);font-size:11px">{pat}</td>
+              <td style="color:var(--text-3);font-size:11px">${ai:.4f}</td>
+              <td style="color:var(--text-3);font-size:11px">{dt}</td>
             </tr>"""
 
         st.markdown(f"""

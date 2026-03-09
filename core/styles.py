@@ -463,24 +463,118 @@ div.stTextArea textarea:focus {
     border-color: var(--accent) !important;
     box-shadow: 0 0 0 3px var(--accent-bg) !important;
 }
-div[data-baseweb="select"] > div {
-    border: 1px solid var(--border) !important;
-    border-radius: 7px !important;
-    background: var(--surface-2) !important;
+
+/* ── LABELS (all form elements) ──────────────────────────────────────────── */
+div.stSelectbox label,
+div.stMultiSelect label,
+div.stTextInput label,
+div.stTextArea label,
+div.stNumberInput label,
+div.stSlider label,
+div.stCheckbox label span,
+div.stRadio label span,
+div.stFileUploader label,
+div[data-testid="stWidgetLabel"] {
+    color: var(--text-2) !important;
     font-size: 13px !important;
     font-family: 'Inter', sans-serif !important;
 }
 
+/* ── SELECT / DROPDOWN — all nesting levels ──────────────────────────────── */
+div[data-baseweb="select"] > div,
+div[data-baseweb="select"] > div > div,
+div[data-baseweb="select"] [data-baseweb="input-container"],
+div[data-baseweb="select"] [data-baseweb="select-placeholder"] {
+    background: var(--surface-2) !important;
+    border-color: var(--border) !important;
+    border-radius: 7px !important;
+    font-size: 13px !important;
+    font-family: 'Inter', sans-serif !important;
+    color: var(--text-1) !important;
+}
+/* Selected value text */
+div[data-baseweb="select"] span,
+div[data-baseweb="select"] [data-baseweb="single-value"],
+div[data-baseweb="select"] [data-baseweb="value-container"] {
+    color: var(--text-1) !important;
+    font-family: 'Inter', sans-serif !important;
+}
+/* Dropdown arrow icon */
+div[data-baseweb="select"] svg { fill: var(--text-2) !important; }
+
+/* Dropdown listbox (the popup) */
+[data-baseweb="menu"],
+[data-baseweb="popover"] > div {
+    background: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-md) !important;
+    box-shadow: var(--shadow-md) !important;
+}
+[data-baseweb="option"] {
+    background: var(--surface) !important;
+    color: var(--text-1) !important;
+    font-size: 13px !important;
+    font-family: 'Inter', sans-serif !important;
+}
+[data-baseweb="option"]:hover,
+[data-baseweb="option"][aria-selected="true"] {
+    background: var(--surface-2) !important;
+}
+
+/* MultiSelect tags */
+div[data-baseweb="multi-value"] {
+    background: var(--accent-bg) !important;
+    border: 1px solid var(--accent-border) !important;
+    border-radius: 4px !important;
+}
+div[data-baseweb="multi-value"] span { color: var(--accent) !important; }
+
+/* Slider */
+div[data-testid="stSlider"] [data-baseweb="slider"] [role="slider"] {
+    background: var(--accent) !important;
+    border-color: var(--accent) !important;
+}
+
+/* Radio and checkbox */
+div.stRadio [data-testid="stMarkdownContainer"] p,
+div.stCheckbox [data-testid="stMarkdownContainer"] p {
+    color: var(--text-2) !important;
+    font-size: 13px !important;
+}
+
+/* File uploader */
+div[data-testid="stFileUploader"] section {
+    background: var(--surface-2) !important;
+    border: 1px dashed var(--border) !important;
+    border-radius: var(--radius-md) !important;
+}
+
 /* ── TABS ────────────────────────────────────────────────────────────────── */
+div[data-baseweb="tab-list"] {
+    background: transparent !important;
+    border-bottom: 1px solid var(--border) !important;
+}
 button[data-baseweb="tab"] {
     font-family: 'Inter', sans-serif !important;
     font-size: 13px !important;
     font-weight: 500 !important;
-    color: var(--text-3) !important;
+    color: var(--text-2) !important;
+    background: transparent !important;
+}
+button[data-baseweb="tab"]:hover {
+    color: var(--text-1) !important;
+    background: var(--surface-2) !important;
 }
 button[data-baseweb="tab"][aria-selected="true"] {
     color: var(--text-1) !important;
-    border-bottom-color: var(--accent) !important;
+    font-weight: 600 !important;
+    border-bottom: 2px solid var(--accent) !important;
+    background: transparent !important;
+}
+/* Tab panel content area */
+div[data-baseweb="tab-panel"] {
+    background: transparent !important;
+    padding-top: 16px !important;
 }
 
 /* ── STREAMLIT NATIVE COMPONENTS ─────────────────────────────────────────── */

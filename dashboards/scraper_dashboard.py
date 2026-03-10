@@ -19,55 +19,10 @@ import pandas as pd
 
 from core.db import get_connection
 
-# ── STYLE ─────────────────────────────────────────────────────────────────────
-CSS = """
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Outfit:wght@400;500;600&display=swap');
-
-.page-title{font-family:'Playfair Display',serif;font-size:28px;font-weight:700;
-  color:#1a1917;letter-spacing:-0.5px;margin-bottom:4px}
-.page-sub{font-size:13px;color:#999;margin-bottom:28px}
-.stat-row{display:flex;gap:14px;margin-bottom:28px;flex-wrap:wrap}
-.stat-card{flex:1;min-width:120px;background:#fff;border:1px solid #e8e4dd;
-  border-radius:10px;padding:18px 20px}
-.stat-val{font-family:'Playfair Display',serif;font-size:28px;font-weight:700;color:#1a1917}
-.stat-label{font-size:10px;color:#aaa;text-transform:uppercase;letter-spacing:1.2px;
-  margin-top:3px;font-weight:600}
-.stat-note{font-size:11px;color:#c9a96e;margin-top:5px;font-weight:600}
-.sec-header{font-family:'Playfair Display',serif;font-size:17px;font-weight:700;
-  color:#1a1917;margin:28px 0 12px;padding-bottom:8px;border-bottom:1px solid #e8e4dd}
-.launch-box{background:#fff;border:1px solid #e8e4dd;border-radius:10px;
-  padding:24px 28px;margin-bottom:8px}
-.tip{background:#fffdf5;border:1px solid #e8d5a8;border-left:3px solid #c9a96e;
-  border-radius:6px;padding:12px 16px;font-size:12px;color:#8a7040;margin:14px 0}
-.tbl{background:#fff;border:1px solid #e8e4dd;border-radius:10px;overflow:hidden}
-.tbl table{width:100%;border-collapse:collapse;font-size:12px}
-.tbl th{background:#f8f7f4;padding:10px 16px;text-align:left;font-size:10px;
-  font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:1.2px;
-  border-bottom:1px solid #e8e4dd}
-.tbl td{padding:10px 16px;border-bottom:1px solid #f0ede8;color:#555;vertical-align:middle}
-.tbl td.n{color:#1a1917;font-weight:600}
-.tbl tr:last-child td{border-bottom:none}
-.tbl tr:hover td{background:#faf9f7}
-.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:600}
-.b-run {background:#fff8ec;color:#c9a96e;border:1px solid #e8d5a8}
-.b-done{background:#ecf7f0;color:#3d9e6a;border:1px solid #b8dfc8}
-.b-fail{background:#fdecea;color:#d45050;border:1px solid #f0b8b8}
-.terminal{background:#111;color:#c8c8c8;border-radius:8px;padding:16px;
-  font-family:'Courier New',monospace;font-size:11px;max-height:380px;
-  overflow-y:auto;white-space:pre-wrap;line-height:1.6;margin-top:12px}
-div.stButton>button{border-radius:7px!important;font-family:'Outfit',sans-serif!important;
-  font-weight:600!important;font-size:13px!important}
-div.stButton>button[kind="primary"]{background:#1a1917!important;color:#fff!important;border:none!important}
-div.stButton>button[kind="primary"]:hover{background:#c9a96e!important}
-div.stButton>button[kind="secondary"]{background:transparent!important;color:#1a1917!important;
-  border:1px solid #d0ccc5!important}
-div.stTextInput input{border:1px solid #e0dbd4!important;border-radius:7px!important;
-  background:#faf9f7!important;font-size:13px!important;padding:10px 14px!important}
-div.stTextInput input:focus{border-color:#c9a96e!important;
-  box-shadow:0 0 0 3px rgba(201,169,110,.12)!important}
-</style>
-"""
+# ── STYLE (page-specific only — shared styles via core/styles.py) ─────────────
+# All shared components (.stat-card, .tbl, .badge, .b-run/done/fail, .terminal,
+# .tip, .page-title, .page-sub, .launch-box, buttons, inputs) live in core/styles.py
+CSS = ""  # kept for compatibility; actual styles injected in render()
 
 _PROJECT_ROOT = Path(__file__).parent.parent
 _SESSIONS_DIR = _PROJECT_ROOT / "data" / "system" / "sessions"
@@ -112,6 +67,42 @@ def _get_recent_sessions(org_id: int, limit: int = 15) -> list:
     except Exception as e:
         logging.warning(f"[scraper_dashboard._get_recent_sessions] {e}")
         return []
+    finally:
+        conn.close()
+
+
+def _clear_stale_sessions(org_id: int, max_age_hours: int = 4):
+    """Mark any 'running' sessions older than max_age_hours as failed."""
+    conn = get_connection()
+    try:
+        cutoff = (datetime.datetime.utcnow() -
+                  datetime.timedelta(hours=max_age_hours)).isoformat()
+        conn.execute("""
+            UPDATE scrape_sessions
+            SET status='failed', finished_at=?
+            WHERE (org_id=? OR org_id IS NULL)
+              AND status='running'
+              AND started_at < ?
+        """, (datetime.datetime.utcnow().isoformat(), org_id, cutoff))
+        conn.commit()
+    except Exception as e:
+        logging.warning(f"[scraper_dashboard._clear_stale_sessions] {e}")
+    finally:
+        conn.close()
+
+
+def _force_clear_running(org_id: int):
+    """Admin action: mark ALL running sessions for this org as failed."""
+    conn = get_connection()
+    try:
+        conn.execute("""
+            UPDATE scrape_sessions
+            SET status='failed', finished_at=?
+            WHERE (org_id=? OR org_id IS NULL) AND status='running'
+        """, (datetime.datetime.utcnow().isoformat(), org_id))
+        conn.commit()
+    except Exception as e:
+        logging.warning(f"[scraper_dashboard._force_clear_running] {e}")
     finally:
         conn.close()
 
@@ -309,7 +300,11 @@ def render(user: dict = None):
     role   = (user or {}).get("role", "researcher")
     is_admin = role in ("super_admin", "org_admin")
 
-    st.markdown(CSS, unsafe_allow_html=True)
+    # Auto-expire stale locks (sessions stuck 'running' for > 4 hours)
+    _clear_stale_sessions(org_id)
+
+    from core.styles import inject_shared_css
+    inject_shared_css()
 
     st.markdown('<div class="page-title">Smart Scraper</div>', unsafe_allow_html=True)
     st.markdown(
@@ -517,7 +512,7 @@ def render(user: dict = None):
                 go = st.button("🚀 Launch", type="primary", use_container_width=True)
             with c2:
                 st.markdown(
-                    '<p style="font-size:12px;color:#bbb;padding-top:12px">'
+                    '<p style="font-size:12px;color:var(--text-3);padding-top:12px">'
                     "Runs in background — you can navigate away while it scrapes.</p>",
                     unsafe_allow_html=True,
                 )
@@ -541,11 +536,16 @@ def render(user: dict = None):
             # Scrape lock — only one active scrape per org
             running = _get_running_session(org_id)
             if running:
+                started = (running.get('started_at') or '')[:16]
                 st.warning(
-                    f"⚠️ A scrape is already running for your org "
-                    f"(started {(running.get('started_at') or '')[:16]}). "
-                    f"Wait for it to finish or check the database."
+                    f"⚠️ A scrape session is still marked as running "
+                    f"(started {started}). If no scrape is actually running, "
+                    f"use the button below to clear the lock."
                 )
+                if st.button("🔓 Force clear lock", type="secondary"):
+                    _force_clear_running(org_id)
+                    st.success("Lock cleared — you can now launch a new scrape.")
+                    st.rerun()
             else:
                 script_path = _PROJECT_ROOT / scraper["script"]
                 if not script_path.exists():
@@ -598,7 +598,7 @@ def render(user: dict = None):
 
     sessions = _get_recent_sessions(org_id, 15)
     if not sessions:
-        st.markdown('<p style="color:#aaa;font-size:13px;padding:16px 0">No sessions yet.</p>',
+        st.markdown('<p style="color:var(--text-3);font-size:13px;padding:16px 0">No sessions yet.</p>',
                     unsafe_allow_html=True)
     else:
         rows_html = ""
@@ -611,12 +611,12 @@ def render(user: dict = None):
             rows_html += f"""<tr>
               <td class="n">{evt}</td><td>{cat}</td>
               <td>{sess.get('leads_found', 0)}</td>
-              <td style="color:#3d9e6a;font-weight:600">{sess.get('leads_new', 0)}</td>
-              <td style="color:#aaa">{sess.get('leads_dupes', 0)}</td>
+              <td style="color:var(--success);font-weight:600">{sess.get('leads_new', 0)}</td>
+              <td style="color:var(--text-3)">{sess.get('leads_dupes', 0)}</td>
               <td>{badge(sess.get('status', 'running'))}</td>
-              <td style="color:#bbb;font-size:11px">{pat}</td>
-              <td style="color:#bbb;font-size:11px">${ai:.4f}</td>
-              <td style="color:#bbb;font-size:11px">{dt}</td>
+              <td style="color:var(--text-3);font-size:11px">{pat}</td>
+              <td style="color:var(--text-3);font-size:11px">${ai:.4f}</td>
+              <td style="color:var(--text-3);font-size:11px">{dt}</td>
             </tr>"""
 
         st.markdown(f"""

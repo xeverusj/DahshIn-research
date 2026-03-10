@@ -7,3 +7,5 @@ Pillow>=10.0.0
 requests>=2.31.0
 python-dotenv>=1.0.0
 bcrypt>=4.0.0
+lxml>=4.9.0
+cssselect>=1.2.0

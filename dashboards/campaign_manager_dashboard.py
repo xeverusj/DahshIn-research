@@ -23,95 +23,7 @@ from services.notification_service import notify_meeting_booked
 
 STYLES = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700&family=Inter:wght@300;400;500&display=swap');
-
-.stApp { background: #FAFAF8; font-family: 'Inter', sans-serif; }
-section[data-testid="stSidebar"] { background: #1A1917 !important; }
-section[data-testid="stSidebar"] * { color: #E8E6E1 !important; }
-
-.cm-header {
-    background: #1A1917;
-    border-radius: 10px;
-    padding: 20px 28px;
-    color: #F7F6F3;
-    margin-bottom: 24px;
-}
-.cm-title {
-    font-family: 'Syne', sans-serif;
-    font-size: 22px;
-    font-weight: 700;
-    letter-spacing: -0.5px;
-}
-.cm-sub { font-size: 12px; color: #888; margin-top: 4px; }
-
-.camp-selector {
-    background: white;
-    border: 1px solid #E8E6E1;
-    border-radius: 8px;
-    padding: 16px;
-    margin-bottom: 20px;
-}
-
-.status-pill {
-    display: inline-block;
-    padding: 3px 10px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-}
-.s-new               { background:#F5F5F5;  color:#666; }
-.s-contacted         { background:#E3F2FD;  color:#1565C0; }
-.s-waiting           { background:#FFF9C4;  color:#827717; }
-.s-responded         { background:#E8F5E9;  color:#2E7D32; }
-.s-interested        { background:#E1F5FE;  color:#01579B; }
-.s-meeting_requested { background:#FFF3E0;  color:#E65100; }
-.s-booked            { background:#C8E6C9;  color:#1B5E20; }
-.s-not_interested    { background:#FFCDD2;  color:#B71C1C; }
-.s-no_show           { background:#F3E5F5;  color:#4A148C; }
-
-.crm-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 13px;
-}
-.crm-table th {
-    background: #1A1917;
-    color: white;
-    padding: 10px 12px;
-    text-align: left;
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-.crm-table td {
-    padding: 10px 12px;
-    border-bottom: 1px solid #F0EDE8;
-    vertical-align: top;
-}
-.crm-table tr:hover td { background: #FAFAF8; }
-
-.stats-card {
-    background: white;
-    border: 1px solid #E8E6E1;
-    border-radius: 8px;
-    padding: 16px;
-    text-align: center;
-}
-.stats-num {
-    font-family: 'Syne', sans-serif;
-    font-size: 28px;
-    font-weight: 700;
-    color: #1A1917;
-}
-.stats-label {
-    font-size: 11px;
-    color: #999;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-top: 2px;
-}
+/* Campaign manager specific — shared components in core/styles.py */
 </style>
 """
 
@@ -122,6 +34,8 @@ CRM_STATUSES = [
 
 
 def render(user: dict):
+    from core.styles import inject_shared_css
+    inject_shared_css()
     st.markdown(STYLES, unsafe_allow_html=True)
     org_id  = user["org_id"]
     user_id = user["id"]

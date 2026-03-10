@@ -23,112 +23,14 @@ from services.lead_service import get_lead
 
 STYLES = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
-
-.stApp { background: #F5F4F0; font-family: 'DM Sans', sans-serif; }
-section[data-testid="stSidebar"] { background: #1C1C1C !important; }
-section[data-testid="stSidebar"] * { color: #F0EDE8 !important; }
-
-.rm-header {
-    background: linear-gradient(135deg, #1C1C1C 0%, #2D2D2D 100%);
-    border-radius: 10px;
-    padding: 22px 28px;
-    color: #F0EDE8;
-    margin-bottom: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-.rm-title {
-    font-size: 20px;
-    font-weight: 600;
-    letter-spacing: -0.4px;
-}
-.rm-sub {
-    font-family: 'DM Mono', monospace;
-    font-size: 11px;
-    color: #888;
-    margin-top: 4px;
-}
-
-.kpi-table {
-    background: white;
-    border-radius: 8px;
-    border: 1px solid #E8E6E1;
-    overflow: hidden;
-    margin-bottom: 20px;
-}
-.kpi-table-header {
-    background: #1C1C1C;
-    color: white;
-    padding: 10px 16px;
-    font-size: 12px;
-    font-family: 'DM Mono', monospace;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    display: grid;
-    grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1fr;
-    gap: 8px;
-}
-.kpi-table-row {
-    padding: 12px 16px;
-    display: grid;
-    grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1fr;
-    gap: 8px;
-    border-bottom: 1px solid #F0EDE8;
-    font-size: 13px;
-    align-items: center;
-}
-.kpi-table-row:last-child { border-bottom: none; }
-.kpi-table-row:hover { background: #FAFAF8; }
-
-.kpi-good  { color: #2E7D32; font-weight: 600; }
-.kpi-warn  { color: #E65100; font-weight: 600; }
-.kpi-bad   { color: #C62828; font-weight: 600; }
-
-.task-review-card {
-    background: white;
-    border: 1px solid #E8E6E1;
-    border-radius: 8px;
-    padding: 16px 20px;
-    margin-bottom: 12px;
-}
-.task-review-title {
-    font-weight: 600;
-    font-size: 14px;
-    margin-bottom: 6px;
-}
-.task-review-meta {
-    font-family: 'DM Mono', monospace;
-    font-size: 11px;
-    color: #888;
-}
-
-.flag-card {
-    background: white;
-    border: 1px solid #FFCDD2;
-    border-left: 4px solid #E53935;
-    border-radius: 8px;
-    padding: 14px 18px;
-    margin-bottom: 10px;
-}
-.flag-card.warning {
-    border-color: #FFE0B2;
-    border-left-color: #F57C00;
-}
-
-.quota-card {
-    background: white;
-    border: 1px solid #E8E6E1;
-    border-radius: 8px;
-    padding: 16px;
-    margin-bottom: 10px;
-}
+/* Research manager unique CSS — all shared components in core/styles.py */
 </style>
 """
 
 
 def render(user: dict):
+    from core.styles import inject_shared_css
+    inject_shared_css()
     st.markdown(STYLES, unsafe_allow_html=True)
 
     org_id  = user["org_id"]

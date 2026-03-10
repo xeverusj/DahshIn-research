@@ -29,89 +29,7 @@ def _row(cursor_result):
 
 STYLES = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
-
-.stApp { background: #F8F7F4; font-family: 'Space Grotesk', sans-serif; }
-section[data-testid="stSidebar"] { background: #111 !important; }
-section[data-testid="stSidebar"] * { color: #EEE !important; }
-
-.admin-header {
-    background: #111;
-    border-radius: 10px;
-    padding: 22px 28px;
-    color: #F8F7F4;
-    margin-bottom: 24px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-.admin-title { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
-.admin-sub   { font-size: 12px; color: #888; margin-top: 3px; }
-
-.user-row {
-    background: white;
-    border: 1px solid #E8E6E1;
-    border-radius: 8px;
-    padding: 14px 18px;
-    margin-bottom: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-.user-name  { font-weight: 600; font-size: 14px; }
-.user-email { font-size: 12px; color: #888; margin-top: 2px; }
-.role-chip {
-    display: inline-block;
-    padding: 3px 10px;
-    border-radius: 12px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-}
-.role-org_admin        { background:#E8F5E9; color:#1B5E20; }
-.role-manager          { background:#E3F2FD; color:#0D47A1; }
-.role-research_manager { background:#F3E5F5; color:#4A148C; }
-.role-campaign_manager { background:#FFF3E0; color:#E65100; }
-.role-researcher       { background:#F5F5F5; color:#333; }
-.role-client_admin     { background:#FCE4D6; color:#BF360C; }
-.role-client_user      { background:#FFF8E1; color:#827717; }
-
-.client-card {
-    background: white;
-    border: 1px solid #E8E6E1;
-    border-radius: 8px;
-    padding: 16px 20px;
-    margin-bottom: 10px;
-}
-.client-name { font-weight: 700; font-size: 15px; }
-.client-meta { font-size: 12px; color: #888; margin-top: 4px; }
-
-.invite-card {
-    background: #FFFBF0;
-    border: 1px solid #FFE082;
-    border-radius: 8px;
-    padding: 14px 18px;
-    margin-bottom: 10px;
-}
-.invite-token {
-    font-family: monospace;
-    background: #F5F5F5;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 12px;
-    word-break: break-all;
-}
-
-.stat-chip {
-    display: inline-block;
-    background: #F0EDE8;
-    color: #555;
-    padding: 3px 12px;
-    border-radius: 20px;
-    font-size: 12px;
-    margin-right: 6px;
-}
+/* Admin-specific — shared components in core/styles.py */
 </style>
 """
 
@@ -134,6 +52,8 @@ ROLE_DISPLAY = {
 
 
 def render(user: dict):
+    from core.styles import inject_shared_css
+    inject_shared_css()
     st.markdown(STYLES, unsafe_allow_html=True)
 
     org_id  = user["org_id"]

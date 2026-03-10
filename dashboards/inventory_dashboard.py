@@ -27,105 +27,19 @@ def _safe_row(row):
 # ── STYLE ─────────────────────────────────────────────────────────────────────
 CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Outfit:wght@300;400;500;600;700&display=swap');
-html,body,[class*="css"]{font-family:'Outfit',sans-serif!important}
-
-.page-title{font-family:'Playfair Display',serif;font-size:28px;font-weight:700;
-  color:#1a1917;letter-spacing:-.5px;margin-bottom:4px}
-.page-sub{font-size:13px;color:#999;margin-bottom:24px}
-
-/* Stat bar */
-.stat-row{display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap}
-.stat-card{flex:1;min-width:130px;background:#fff;border:1px solid #e8e4dd;
-  border-radius:10px;padding:16px 18px}
-.stat-val{font-family:'Playfair Display',serif;font-size:26px;font-weight:700;color:#1a1917}
-.stat-label{font-size:10px;color:#aaa;text-transform:uppercase;letter-spacing:1.2px;
-  margin-top:3px;font-weight:600}
-.stat-note{font-size:11px;margin-top:4px;font-weight:600}
-.note-green{color:#3d9e6a} .note-gold{color:#c9a96e} .note-blue{color:#4a6cf7}
-.note-red{color:#d45050}   .note-grey{color:#aaa}
-
-/* Filters bar */
-.filter-bar{background:#fff;border:1px solid #e8e4dd;border-radius:10px;
-  padding:16px 20px;margin-bottom:20px}
-
-/* Section header */
-.sec-hd{font-family:'Playfair Display',serif;font-size:17px;font-weight:700;
-  color:#1a1917;margin:24px 0 12px;padding-bottom:8px;border-bottom:1px solid #e8e4dd;
-  display:flex;align-items:center;justify-content:space-between}
-
-/* Lead table */
-.tbl{background:#fff;border:1px solid #e8e4dd;border-radius:10px;overflow:hidden;margin-bottom:24px}
-.tbl table{width:100%;border-collapse:collapse;font-size:12px}
-.tbl th{background:#f8f7f4;padding:10px 14px;text-align:left;font-size:10px;
-  font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:1.2px;
-  border-bottom:1px solid #e8e4dd}
-.tbl td{padding:10px 14px;border-bottom:1px solid #f0ede8;color:#666;vertical-align:middle}
-.tbl td.n{color:#1a1917;font-weight:600;font-size:13px}
-.tbl td.co{color:#555;font-weight:500}
-.tbl tr:last-child td{border-bottom:none}
-.tbl tr:hover td{background:#faf9f7;cursor:pointer}
-
-/* Badges */
-.badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:9px;font-weight:700;letter-spacing:.4px}
-.b-new      {background:#f0f4ff;color:#4a6cf7;border:1px solid #c0ceff}
-.b-assigned {background:#fff8ec;color:#c9a96e;border:1px solid #e8d5a8}
-.b-progress {background:#f3f0ff;color:#7c3aed;border:1px solid #d0c0ff}
-.b-enriched {background:#ecf7f0;color:#3d9e6a;border:1px solid #b8dfc8}
-.b-used     {background:#f5f5f5;color:#888;border:1px solid #ddd}
-.b-archived {background:#1a1917;color:#c9a96e;border:1px solid #3a3530}
-
-/* Persona badges */
-.p-dm  {background:rgba(212,80,80,.1);color:#d45050}
-.p-si  {background:rgba(201,169,110,.1);color:#c9a96e}
-.p-inf {background:rgba(74,108,247,.1);color:#4a6cf7}
-.p-ic  {background:rgba(100,200,130,.1);color:#3d9e6a}
-.p-unk {background:#f5f5f5;color:#aaa}
-
-/* Detail panel */
-.detail-panel{background:#fff;border:1px solid #e8e4dd;border-radius:10px;padding:24px;margin-bottom:16px}
-.detail-name{font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#1a1917;margin-bottom:4px}
-.detail-sub{font-size:13px;color:#888;margin-bottom:20px}
-.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
-.detail-field{background:#f8f7f4;border-radius:7px;padding:12px 14px}
-.detail-field-label{font-size:9px;color:#aaa;text-transform:uppercase;letter-spacing:1.2px;font-weight:700;margin-bottom:4px}
-.detail-field-val{font-size:13px;color:#1a1917;font-weight:500}
-
-/* Archive list cards */
-.list-card{background:#fff;border:1px solid #e8e4dd;border-radius:10px;padding:18px 20px;margin-bottom:10px}
-.list-card-name{font-family:'Playfair Display',serif;font-size:15px;font-weight:700;color:#1a1917;margin-bottom:2px}
-.list-card-meta{font-size:11px;color:#aaa;margin-bottom:8px}
-.list-card-desc{font-size:12px;color:#666;line-height:1.5}
-
-/* Client conflict warning */
-.conflict-warn{background:#fdecea;border:1px solid #f0b8b8;border-left:3px solid #d45050;
-  border-radius:6px;padding:10px 14px;font-size:12px;color:#d45050;margin:8px 0}
-.conflict-ok{background:#ecf7f0;border:1px solid #b8dfc8;border-left:3px solid #3d9e6a;
-  border-radius:6px;padding:10px 14px;font-size:12px;color:#3d9e6a;margin:8px 0}
-
-/* Buttons */
-div.stButton>button{border-radius:7px!important;font-family:'Outfit',sans-serif!important;
-  font-weight:600!important;font-size:12px!important}
-div.stButton>button[kind="primary"]{background:#1a1917!important;color:#fff!important;border:none!important}
-div.stButton>button[kind="primary"]:hover{background:#c9a96e!important}
-div.stButton>button[kind="secondary"]{background:transparent!important;color:#1a1917!important;
-  border:1px solid #d0ccc5!important}
-div.stSelectbox>div>div{border:1px solid #e0dbd4!important;border-radius:7px!important;
-  background:#faf9f7!important;font-size:13px!important}
-div.stTextInput input{border:1px solid #e0dbd4!important;border-radius:7px!important;
-  background:#faf9f7!important;font-size:13px!important;padding:10px 14px!important}
-div.stTextInput input:focus{border-color:#c9a96e!important;
-  box-shadow:0 0 0 3px rgba(201,169,110,.12)!important}
-div.stTextArea textarea{border:1px solid #e0dbd4!important;border-radius:7px!important;
-  background:#faf9f7!important;font-size:13px!important}
-div.stMultiSelect>div>div{border:1px solid #e0dbd4!important;border-radius:7px!important;background:#faf9f7!important}
-
+/* MultiSelect widget (inventory-specific) */
+div.stMultiSelect > div > div {
+    border: 1px solid var(--border) !important;
+    border-radius: 7px !important;
+    background: var(--surface-2) !important;
+}
 /* Pagination */
-.pag-info{font-size:12px;color:#aaa;text-align:center;padding:12px 0}
-
+.pag-info { font-size: 12px; color: var(--text-3); text-align: center; padding: 12px 0; }
 /* Empty state */
-.empty-state{text-align:center;padding:48px 24px;color:#bbb;font-size:14px}
-.empty-icon{font-size:36px;margin-bottom:12px}
+.empty-state { text-align: center; padding: 48px 24px; color: #BBB; font-size: 14px; }
+.empty-icon  { font-size: 36px; margin-bottom: 12px; }
+/* Pointer cursor on lead rows */
+.tbl tr:hover td { cursor: pointer; }
 </style>
 """
 
@@ -375,15 +289,15 @@ def render_detail_panel(lead, user):
     events = get_lead_events(lead['id'])
     if events:
         ev_html = "".join([
-            f'<div style="font-size:11px;color:#888;padding:4px 0;border-bottom:1px solid #f0ede8">'
-            f'<b style="color:#555">{e.get("event_name") or "Unknown event"}</b>'
+            f'<div style="font-size:11px;color:var(--text-3);padding:4px 0;border-bottom:1px solid var(--border-light)">'
+            f'<b style="color:var(--text-2)">{e.get("event_name") or "Unknown event"}</b>'
             f'{"  ·  "+e["category"] if e.get("category") else ""}'
-            f'<span style="float:right;color:#bbb">{(e.get("scraped_at") or "")[:10]}</span></div>'
+            f'<span style="float:right;color:var(--text-3)">{(e.get("scraped_at") or "")[:10]}</span></div>'
             for e in events
         ])
         st.markdown(f"""
         <div style="margin-bottom:12px">
-          <div style="font-size:10px;color:#aaa;text-transform:uppercase;letter-spacing:1.2px;
+          <div style="font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:1.2px;
             font-weight:700;margin-bottom:6px">Event History</div>
           {ev_html}
         </div>
@@ -393,15 +307,15 @@ def render_detail_panel(lead, user):
     used_clients = get_lead_clients(lead['id'])
     if used_clients:
         cl_html = "".join([
-            f'<div style="font-size:11px;color:#d45050;padding:4px 0;border-bottom:1px solid #fdecea">'
+            f'<div style="font-size:11px;color:var(--error);padding:4px 0;border-bottom:1px solid var(--error-bg)">'
             f'<b>{c["name"]}</b>'
             f'{"  ·  "+c["campaign"] if c.get("campaign") else ""}'
-            f'<span style="float:right;color:#f0b8b8">{(c.get("used_at") or "")[:10]}</span></div>'
+            f'<span style="float:right;color:var(--error-border)">{(c.get("used_at") or "")[:10]}</span></div>'
             for c in used_clients
         ])
         st.markdown(f"""
         <div style="margin-bottom:12px">
-          <div style="font-size:10px;color:#d45050;text-transform:uppercase;letter-spacing:1.2px;
+          <div style="font-size:10px;color:var(--error);text-transform:uppercase;letter-spacing:1.2px;
             font-weight:700;margin-bottom:6px">⚠ Already Used For</div>
           {cl_html}
         </div>
@@ -412,8 +326,7 @@ def render_detail_panel(lead, user):
 
     if lead.get('notes'):
         st.markdown(f"""
-        <div style="background:#fffdf5;border:1px solid #e8d5a8;border-radius:7px;
-          padding:12px 14px;font-size:12px;color:#8a7040;margin-bottom:12px">
+        <div class="tip" style="border-radius:7px;margin-bottom:12px">
           <b>Notes:</b> {lead['notes']}
         </div>""", unsafe_allow_html=True)
 
@@ -450,8 +363,8 @@ def render_detail_panel(lead, user):
 # ── ARCHIVED LISTS VIEW ────────────────────────────────────────────────────────
 
 def render_archived_lists(user):
-    st.markdown('<div style="font-family:\'Playfair Display\',serif;font-size:28px;font-weight:700;color:#1a1917;margin-bottom:4px">Archived Lists</div>', unsafe_allow_html=True)
-    st.markdown('<div style="font-size:13px;color:#999;margin-bottom:24px">Named lead lists organised by industry. Reusable assets.</div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-family:\'Playfair Display\',serif;font-size:28px;font-weight:700;color:var(--text-1);margin-bottom:4px">Archived Lists</div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-size:13px;color:var(--text-3);margin-bottom:24px">Named lead lists organised by industry. Reusable assets.</div>', unsafe_allow_html=True)
 
     lists = get_archived_lists()
 
@@ -486,7 +399,7 @@ def render_archived_lists(user):
                   <div class="list-card-name">{lst['name']}</div>
                   <div class="list-card-meta">
                     {lst.get('industry') or 'No industry set'}
-                    · <b style="color:#1a1917">{lst['lead_count']}</b> leads
+                    · <b style="color:var(--text-1)">{lst['lead_count']}</b> leads
                     · Created {(lst.get('created_at') or '')[:10]}
                     {' · by '+lst['created_by_name'] if lst.get('created_by_name') else ''}
                   </div>
@@ -531,7 +444,7 @@ def _get_list_export(list_id):
 
 def render_conflict_checker():
     st.markdown('<div class="sec-hd">Client Conflict Checker</div>', unsafe_allow_html=True)
-    st.markdown('<p style="font-size:13px;color:#888;margin-bottom:16px">Check which leads in a list are already used for a specific client before exporting.</p>', unsafe_allow_html=True)
+    st.markdown('<p style="font-size:13px;color:var(--text-3);margin-bottom:16px">Check which leads in a list are already used for a specific client before exporting.</p>', unsafe_allow_html=True)
 
     clients = get_clients()
     lists   = get_archived_lists()
@@ -571,7 +484,7 @@ def render_conflict_checker():
             conflict_names = [l['full_name'] for l in leads_in_list if l['id'] in conflicts]
             with st.expander(f"View {len(conflicts)} conflicting lead(s)"):
                 for n in conflict_names:
-                    st.markdown(f'<div style="font-size:12px;color:#d45050;padding:3px 0">✕ {n}</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div style="font-size:12px;color:var(--error);padding:3px 0">✕ {n}</div>', unsafe_allow_html=True)
         else:
             st.markdown(f'<div class="conflict-ok">✓ No conflicts — all {len(lead_ids)} leads are safe to use for {sel_client["name"]}.</div>', unsafe_allow_html=True)
 
@@ -655,7 +568,7 @@ def render_leads_table(user):
                 st.rerun()
 
     # Table
-    st.markdown(f'<div style="font-size:12px;color:#aaa;margin-bottom:10px">{total:,} leads found</div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="font-size:12px;color:var(--text-3);margin-bottom:10px">{total:,} leads found</div>', unsafe_allow_html=True)
 
     if not leads:
         st.markdown('<div class="empty-state"><div class="empty-icon">🔍</div>No leads match your filters.</div>', unsafe_allow_html=True)
@@ -668,11 +581,11 @@ def render_leads_table(user):
         <tr onclick="window.parent.document.dispatchEvent(new CustomEvent('leadClick', {{detail: {l['id']}}}))">
           <td class="n">{l['full_name']}</td>
           <td class="co">{l.get('company_name') or '—'}</td>
-          <td style="color:#777">{l.get('title') or '—'}</td>
+          <td style="color:var(--text-2)">{l.get('title') or '—'}</td>
           <td>{persona_badge(l.get('persona'))}</td>
           <td>{status_badge(l.get('status','new'))}</td>
-          <td style="color:#aaa;font-size:11px">{l.get('enriched_industry') or '—'}</td>
-          <td style="color:#bbb;font-size:11px">{(l.get('last_seen_at') or '')[:10]}</td>
+          <td style="color:var(--text-3);font-size:11px">{l.get('enriched_industry') or '—'}</td>
+          <td style="color:var(--text-3);font-size:11px">{(l.get('last_seen_at') or '')[:10]}</td>
         </tr>"""
 
     st.markdown(f"""
@@ -704,7 +617,7 @@ def render_leads_table(user):
             st.session_state["inv_page"] = page - 1
             st.rerun()
     with pc2:
-        st.markdown(f'<div style="text-align:center;font-size:12px;color:#aaa;padding-top:10px">Page {page} of {total_pages} · {total:,} leads</div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="text-align:center;font-size:12px;color:var(--text-3);padding-top:10px">Page {page} of {total_pages} · {total:,} leads</div>', unsafe_allow_html=True)
     with pc3:
         if page < total_pages and st.button("Next →", type="secondary", use_container_width=True):
             st.session_state["inv_page"] = page + 1
@@ -720,8 +633,8 @@ def render_upload_tab(user):
     st.markdown('''
     <div style="margin-bottom:20px">
       <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;
-        color:#1a1917;margin-bottom:6px">Upload Enriched CSV</div>
-      <div style="font-size:13px;color:#999">
+        color:var(--text-1);margin-bottom:6px">Upload Enriched CSV</div>
+      <div style="font-size:13px;color:var(--text-3)">
         Upload a researcher-enriched CSV. The system will cross-check against inventory,
         add emails and enrichment data, and link leads to the selected client and campaign.
       </div>
@@ -927,9 +840,7 @@ def render_upload_tab(user):
     if not uploaded_file:
         # Show expected format hint
         st.markdown("""
-        <div class="tip" style="background:#fffdf5;border:1px solid #e8d5a8;
-          border-left:3px solid #c9a96e;border-radius:6px;padding:14px 18px;
-          font-size:12px;color:#8a7040;margin-top:16px">
+        <div class="tip" style="margin-top:16px">
           <b>💡 Accepted column names (any format):</b><br><br>
           <b>Name:</b> Full Name, Name, Contact, Contact Name<br>
           <b>Company:</b> Company, Organisation, Employer, Account<br>
@@ -985,19 +896,19 @@ def render_upload_tab(user):
             map_html += f'''
             <div style="display:flex;justify-content:space-between;padding:8px 0;
               border-bottom:1px solid #f0ede8;font-size:12px">
-              <span style="color:#aaa;font-weight:600;text-transform:uppercase;
+              <span style="color:var(--text-3);font-weight:600;text-transform:uppercase;
                 letter-spacing:.8px;font-size:10px">{label}</span>
-              <span style="color:#1a1917;font-weight:500">
-                <span style="color:#3d9e6a">✓</span> {detected}
+              <span style="color:var(--text-1);font-weight:500">
+                <span style="color:var(--success)">✓</span> {detected}
               </span>
             </div>'''
         else:
             map_html += f'''
             <div style="display:flex;justify-content:space-between;padding:8px 0;
-              border-bottom:1px solid #f0ede8;font-size:12px">
-              <span style="color:#aaa;font-weight:600;text-transform:uppercase;
+              border-bottom:1px solid var(--border-light);font-size:12px">
+              <span style="color:var(--text-3);font-weight:600;text-transform:uppercase;
                 letter-spacing:.8px;font-size:10px">{label}</span>
-              <span style="color:#bbb">— not found</span>
+              <span style="color:var(--text-3)">— not found</span>
             </div>'''
 
     col_a, col_b, col_c = st.columns(3)
@@ -1063,36 +974,36 @@ def render_upload_tab(user):
         <div style="background:#ecf7f0;border:1px solid #b8dfc8;border-radius:10px;
           padding:20px 24px;margin:16px 0">
           <div style="font-family:'Playfair Display',serif;font-size:18px;font-weight:700;
-            color:#1a1917;margin-bottom:12px">✅ Import Complete</div>
+            color:var(--text-1);margin-bottom:12px">✅ Import Complete</div>
           <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
             <div>
               <div style="font-family:'Playfair Display',serif;font-size:22px;
-                font-weight:700;color:#3d9e6a">{found}</div>
-              <div style="font-size:10px;color:#888;text-transform:uppercase;
+                font-weight:700;color:var(--success)">{found}</div>
+              <div style="font-size:10px;color:var(--text-3);text-transform:uppercase;
                 letter-spacing:1px;margin-top:2px">Email Found</div>
             </div>
             <div>
               <div style="font-family:'Playfair Display',serif;font-size:22px;
-                font-weight:700;color:#c9a96e">{no_email}</div>
-              <div style="font-size:10px;color:#888;text-transform:uppercase;
+                font-weight:700;color:var(--accent)">{no_email}</div>
+              <div style="font-size:10px;color:var(--text-3);text-transform:uppercase;
                 letter-spacing:1px;margin-top:2px">No Email</div>
             </div>
             <div>
               <div style="font-family:'Playfair Display',serif;font-size:22px;
-                font-weight:700;color:#4a6cf7">{new_l}</div>
-              <div style="font-size:10px;color:#888;text-transform:uppercase;
+                font-weight:700;color:var(--info)">{new_l}</div>
+              <div style="font-size:10px;color:var(--text-3);text-transform:uppercase;
                 letter-spacing:1px;margin-top:2px">New to Inventory</div>
             </div>
             <div>
               <div style="font-family:'Playfair Display',serif;font-size:22px;
-                font-weight:700;color:#1a1917">{enriched}</div>
-              <div style="font-size:10px;color:#888;text-transform:uppercase;
+                font-weight:700;color:var(--text-1)">{enriched}</div>
+              <div style="font-size:10px;color:var(--text-3);text-transform:uppercase;
                 letter-spacing:1px;margin-top:2px">Existing Enriched</div>
             </div>
           </div>
-          <div style="font-size:12px;color:#888;margin-top:12px">
-            Campaign: <b style="color:#1a1917">{campaign_name}</b>
-            · Client: <b style="color:#1a1917">{client["name"]}</b>
+          <div style="font-size:12px;color:var(--text-3);margin-top:12px">
+            Campaign: <b style="color:var(--text-1)">{campaign_name}</b>
+            · Client: <b style="color:var(--text-1)">{client["name"]}</b>
             · {skipped} rows skipped
           </div>
         </div>
@@ -1103,7 +1014,7 @@ def render_upload_tab(user):
             st.markdown('<div class="sec-hd">✅ Email Found</div>', unsafe_allow_html=True)
             rows_html = ""
             for l in result["email_found"]:
-                tag = '<span style="font-size:10px;color:#3d9e6a">NEW</span>' if not l["was_existing"] else ""
+                tag = '<span style="font-size:10px;color:var(--success)">NEW</span>' if not l["was_existing"] else ""
                 rows_html += f"""<tr>
                   <td class="n">{l["full_name"]} {tag}</td>
                   <td>{l.get("company","—")}</td>
@@ -1135,7 +1046,7 @@ def render_upload_tab(user):
                 rows_html += f"""<tr>
                   <td class="n">{l["full_name"]}</td>
                   <td>{l.get("company","—")}</td>
-                  <td style="color:#aaa">No email found</td>
+                  <td style="color:var(--text-3)">No email found</td>
                   <td>{l.get("linkedin_url","—")}</td>
                   <td>{l.get("industry","—")}</td>
                 </tr>"""
@@ -1253,8 +1164,8 @@ def render_clean_filter_tab(user: dict):
 
     st.markdown('''
     <div style="font-family:'Playfair Display',serif;font-size:22px;
-      font-weight:700;color:#1a1917;margin-bottom:4px">Clean & Filter</div>
-    <div style="font-size:13px;color:#999;margin-bottom:24px">
+      font-weight:700;color:var(--text-1);margin-bottom:4px">Clean & Filter</div>
+    <div style="font-size:13px;color:var(--text-3);margin-bottom:24px">
       Clean names, filter by title/seniority, remove personal emails,
       or filter Clutch companies by size, budget and rating.
     </div>
@@ -1431,11 +1342,11 @@ def _render_people_cleaner(org_id: int):
             title_chips = "  ".join([
                 f'<span style="background:#f8f7f4;border:1px solid #e8e4dd;'
                 f'border-radius:20px;padding:3px 10px;font-size:11px;'
-                f'color:#888;margin:2px;display:inline-block">{t} ({c})</span>'
+                f'color:var(--text-3);margin:2px;display:inline-block">{t} ({c})</span>'
                 for t, c in top_titles.items()
             ])
             st.markdown(
-                f'<div style="margin-bottom:10px;font-size:11px;color:#bbb">'
+                f'<div style="margin-bottom:10px;font-size:11px;color:var(--text-3)">'
                 f'Top titles in this batch:</div>{title_chips}',
                 unsafe_allow_html=True
             )
@@ -1849,12 +1760,14 @@ def _render_clutch_filter(org_id: int):
 
 def render(user):
     init_db()
+    from core.styles import inject_shared_css
+    inject_shared_css()
     st.markdown(CSS, unsafe_allow_html=True)
 
     # Archive lead flow (triggered from detail panel)
     if "archive_lead_id" in st.session_state:
         aid = st.session_state.pop("archive_lead_id")
-        st.markdown('<div style="font-family:\'Playfair Display\',serif;font-size:20px;font-weight:700;color:#1a1917;margin-bottom:16px">Archive Lead</div>', unsafe_allow_html=True)
+        st.markdown('<div style="font-family:\'Playfair Display\',serif;font-size:20px;font-weight:700;color:var(--text-1);margin-bottom:16px">Archive Lead</div>', unsafe_allow_html=True)
         lists = get_archived_lists()
         if lists:
             sel_list = st.selectbox("Choose archived list", lists,
